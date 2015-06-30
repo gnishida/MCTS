@@ -184,8 +184,6 @@ String ParametricLSystem::derive(const String& start_model, int random_seed, int
 	// indicatorを計算する
 	computeIndicator(result, scale, indicator);
 
-	ml::mat_save("indicator.png", indicator);
-
 	return result;
 }
 
