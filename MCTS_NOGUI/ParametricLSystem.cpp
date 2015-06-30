@@ -14,7 +14,7 @@
 #define BETA								1.0
 
 #define CREATE_NEW_NODE_LIMIT				10000
-#define PARAM_EXPLORATION					200//1.4142
+#define PARAM_EXPLORATION					10//1.4142
 
 //#define DEBUG		1
 
