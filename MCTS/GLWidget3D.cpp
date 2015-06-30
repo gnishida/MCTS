@@ -1,45 +1,35 @@
-﻿#include <iostream>
-#include "GLWidget3D.h"
+﻿#include "GLWidget3D.h"
 #include "MainWindow.h"
-#include <GL/GLU.h>
-#include <QTimer>
+#include "OBJLoader.h"
+#include <iostream>
 
-GLWidget3D::GLWidget3D(MainWindow* mainWin) : QGLWidget(QGLFormat(QGL::SampleBuffers), (QWidget*)mainWin) {
+GLWidget3D::GLWidget3D(MainWindow* mainWin) : QGLWidget(QGLFormat(QGL::SampleBuffers), (QWidget*)mainWin), lsystem(300, 0.1) {
 	this->mainWin = mainWin;
-	camera.dz = 50;
-	camera.dy = 0;
 }
 
 /**
  * This event handler is called when the mouse press events occur.
  */
 void GLWidget3D::mousePressEvent(QMouseEvent *e) {
-	lastPos = e->pos();
+	camera.mousePress(e->x(), e->y());
 }
 
 /**
  * This event handler is called when the mouse release events occur.
  */
 void GLWidget3D::mouseReleaseEvent(QMouseEvent *e) {
-
-	updateGL();
 }
 
 /**
  * This event handler is called when the mouse move events occur.
  */
 void GLWidget3D::mouseMoveEvent(QMouseEvent *e) {
-	float dx = (float)(e->x() - lastPos.x());
-	float dy = (float)(e->y() - lastPos.y());
-	lastPos = e->pos();
-
-	if (e->buttons() & Qt::LeftButton) {
-		camera.changeXRotation(dy);
-		camera.changeYRotation(dx);
-	} else if (e->buttons() & Qt::RightButton) {
-		camera.changeXYZTranslation(0, 0, -dy * camera.dz * 0.02f);
-	} else if (e->buttons() & Qt::MidButton) {
-		camera.changeXYZTranslation(-dx * 1, dy * 1, 0);
+	if (e->buttons() & Qt::LeftButton) { // Rotate
+		camera.rotate(e->x(), e->y());
+	} else if (e->buttons() & Qt::MidButton) { // Move
+		camera.move(e->x(), e->y());
+	} else if (e->buttons() & Qt::RightButton) { // Zoom
+		camera.zoom(e->x(), e->y());
 	}
 
 	updateGL();
@@ -49,49 +39,102 @@ void GLWidget3D::mouseMoveEvent(QMouseEvent *e) {
  * This function is called once before the first call to paintGL() or resizeGL().
  */
 void GLWidget3D::initializeGL() {
-	glClearColor(0.443, 0.439, 0.458, 0.0);
+	// init glew
+	GLenum err = glewInit();
+	if (err != GLEW_OK) {
+		std::cout << "Error: " << glewGetErrorString(err) << std::endl;
+	}
 
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
-	glEnable(GL_COLOR_MATERIAL);
+	// 光源位置をセット
+	// ShadowMappingは平行光源を使っている。この位置から原点方向を平行光源の方向とする。
+	light_dir = glm::normalize(glm::vec3(-0.1, 1, -0.2));
 
-	static GLfloat lightPosition[4] = {0.0f, 0.0f, 100.0f, 0.0f};
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	// load shaders
+	Shader shader;
+	program = shader.createProgram("../shaders/vertex.glsl", "../shaders/fragment.glsl");
+	glUseProgram(program);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	shadow.initShadow(program, 4096, 4096);
+
+	// set the clear color for the screen
+	qglClearColor(QColor(113, 112, 117));
 }
 
 /**
  * This function is called whenever the widget has been resized.
  */
 void GLWidget3D::resizeGL(int width, int height) {
-	height = height?height:1;
-
-	glViewport( 0, 0, (GLint)width, (GLint)height );
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(60, (GLfloat)width/(GLfloat)height, 0.1f, 10000);
-	glMatrixMode(GL_MODELVIEW);
+	height = height ? height : 1;
+	glViewport(0, 0, width, height);
+	camera.updatePMatrix(width, height);
 }
 
 /**
  * This function is called whenever the widget needs to be painted.
  */
 void GLWidget3D::paintGL() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_TEXTURE_2D);
 
-	glMatrixMode(GL_MODELVIEW);
-   	camera.applyCamTransform();	
+	// Model view projection行列をシェーダに渡す
+	glUniformMatrix4fv(glGetUniformLocation(program, "mvpMatrix"),  1, GL_FALSE, &camera.mvpMatrix[0][0]);
+	glUniformMatrix4fv(glGetUniformLocation(program, "mvMatrix"),  1, GL_FALSE, &camera.mvMatrix[0][0]);
 
-	drawScene();	
+	// pass the light direction to the shader
+	glUniform1fv(glGetUniformLocation(program, "lightDir"), 3, &light_dir[0]);
+	
+	drawScene(0);	
 }
 
 /**
  * Draw the scene.
  */
-void GLWidget3D::drawScene() {
-	lsystem.draw(model);
-	//lsystem.draw();
+void GLWidget3D::drawScene(int drawMode) {
+	if (drawMode == 0) {
+		glUniform1i(glGetUniformLocation(program,"shadowState"), 1);
+	} else {
+		glUniform1i(glGetUniformLocation(program,"shadowState"), 2);
+	}
+
+	// use color mode
+	glUniform1i(glGetUniformLocation(program, "mode"), 1);
+
+	// bind the vao and draw it.
+	glBindVertexArray(vao);
+	glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+	glBindVertexArray(0);
 }
+
+/**
+ * Create VAO according to the vertices.
+ */
+void GLWidget3D::createVAO() {
+	// create vao and bind it
+	glGenVertexArrays(1,&vao);
+	glBindVertexArray(vao);
+
+	// create VBO and tranfer the vertices data to GPU buffer
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*vertices.size(), vertices.data(), GL_STATIC_DRAW);
+	
+	// configure the attributes in the vao
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
+	// unbind the vao
+	glBindVertexArray(0); 
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	// シャドウマップを更新
+	shadow.makeShadowMap(this, light_dir);
+}
+

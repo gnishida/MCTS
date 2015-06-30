@@ -1,5 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "MLUtils.h"
+#include <QElapsedTimer>
 
 MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, flags) {
 	ui.setupUi(this);
@@ -14,11 +15,13 @@ MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, 
 
 void MainWindow::onRandomGeneration() {
 	cv::Mat indicator;
-	glWidget->model = glWidget->lsystem.derive(0, indicator);
+	glWidget->model = glWidget->lsystem.derive(3, indicator);
 
 	cout << glWidget->model << endl;
 	ml::mat_save("indicator.png", indicator);
 
+	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
+	glWidget->createVAO();
 	glWidget->updateGL();
 }
 
@@ -31,19 +34,22 @@ void MainWindow::onGreedyInverse() {
 	// 白黒を反転させる
 	target_indicator = 1 - target_indicator;
 
-	// blur
-	/*cv::Mat tmp;
-	cv::GaussianBlur(target_indicator, tmp, cv::Size(11, 11), 11, 11);
-	target_indicator += tmp * 0.8;
-	//ml::mat_save("target2.png", target_indicator);
-	*/
+	QElapsedTimer timer;
 
 	// ターゲットに近いモデルを生成する
 	cv::Mat indicator;
 	glWidget->model = glWidget->lsystem.inverse(target_indicator, indicator);
 
 	cout << glWidget->model << endl;
-	ml::mat_save("indicator.png", indicator);
 
+	cout << "Elapsed: " << timer.elapsed() * 0.001 << " [sec]" << endl;
+
+	// 生成したモデルの画像を保存する
+	cv::Mat img;
+	glWidget->lsystem.computeIndicator(glWidget->model, 1.0f, img);
+	ml::mat_save("result.png", img);
+
+	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
+	glWidget->createVAO();
 	glWidget->updateGL();
 }
