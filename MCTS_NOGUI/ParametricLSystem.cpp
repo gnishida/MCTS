@@ -5,7 +5,6 @@
 #include "MLUtils.h"
 #include "GLUtils.h"
 #include <list>
-#include <QGLWidget>
 
 #define MAX_ITERATIONS						200
 #define MAX_ITERATIONS_FOR_MC				50
@@ -15,7 +14,7 @@
 #define BETA								1.0
 
 #define CREATE_NEW_NODE_LIMIT				10000
-#define PARAM_EXPLORATION					10//1.4142
+#define PARAM_EXPLORATION					200//1.4142
 
 //#define DEBUG		1
 
@@ -80,6 +79,12 @@ ostream& operator<<(ostream& os, const String& str) {
     return os;
 }
 
+Node::Node() {
+	max_score = -std::numeric_limits<double>::max();
+	num_visited = 0;
+	num_playout = 0;
+}
+
 Node::Node(const String& model) {
 	this->model = model;
 	max_score = -std::numeric_limits<double>::max();
@@ -96,7 +101,7 @@ ParametricLSystem::ParametricLSystem(int grid_size, float scale) {
 	rules['X'].push_back("F[-X][+X]");
 }
 
-void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices) {
+/*void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices) {
 	vertices.clear();
 
 	glm::mat4 modelMat;
@@ -127,7 +132,7 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 		} else {
 		}
 	}
-}
+}*/
 
 /**
  * 適当な乱数シードに基づいて、ランダムにgenerateする。
@@ -183,8 +188,6 @@ String ParametricLSystem::derive(const String& start_model, int random_seed, int
 
 	// indicatorを計算する
 	computeIndicator(result, scale, indicator);
-
-	ml::mat_save("indicator.png", indicator);
 
 	return result;
 }
@@ -350,18 +353,18 @@ double ParametricLSystem::uct_traverse(Node* node, const cv::Mat& target) {
 	// 子ノードへの訪問数がしきい値を超えたら、子ノードを探索木に追加する
 	if (selected_child != NULL && selected_child->num_visited >= CREATE_NEW_NODE_LIMIT) {
 		expand(selected_child);
-		cout << "Expanded!!!!!" << endl;
 	}
 
 	double score;
 	if (selected_child->children.size() == 0) {
 		cv::Mat indicator;
 		derive(selected_child->model, (int)ml::genRand(0, 10000), MAX_ITERATIONS_FOR_MC, indicator);
+
 		score = 10 * exp(-distance(indicator, target, ALPHA, BETA) * 0.01);
 	} else {
 		score = uct_traverse(selected_child, target);
 	}
-
+	
 	selected_child->max_score = std::max(selected_child->max_score, score);
 	selected_child->num_visited++;
 

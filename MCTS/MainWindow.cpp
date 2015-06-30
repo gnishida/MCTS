@@ -1,6 +1,6 @@
 ﻿#include "MainWindow.h"
 #include "MLUtils.h"
-#include <QElapsedTimer>
+#include <time.h>
 
 MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, flags) {
 	ui.setupUi(this);
@@ -34,7 +34,7 @@ void MainWindow::onGreedyInverse() {
 	// 白黒を反転させる
 	target_indicator = 1 - target_indicator;
 
-	QElapsedTimer timer;
+	time_t start = clock();
 
 	// ターゲットに近いモデルを生成する
 	cv::Mat indicator;
@@ -42,7 +42,8 @@ void MainWindow::onGreedyInverse() {
 
 	cout << glWidget->model << endl;
 
-	cout << "Elapsed: " << timer.elapsed() * 0.001 << " [sec]" << endl;
+	time_t end = clock();
+	cout << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
 
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
