@@ -89,6 +89,7 @@ public:
 	void computeIndicator(String str, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target, cv::Mat& indicator);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);
+	double score(const cv::Mat& indicator, const cv::Mat& target);
 
 	// MCTS関係のメソッド
 	double uct_traverse(Node* node, const cv::Mat& target);

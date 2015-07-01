@@ -15,7 +15,7 @@
 #define BETA								1.0
 
 #define CREATE_NEW_NODE_LIMIT				10000
-#define PARAM_EXPLORATION					10//1.4142
+#define PARAM_EXPLORATION					0.44 //1.4142
 
 //#define DEBUG		1
 
@@ -307,7 +307,6 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
  *
  * @param indicator		indicator
  * @param target		ターゲットindicator
- * @param threshold		しきい値
  * @return				距離
  */
 double ParametricLSystem::distance(const cv::Mat& indicator, const cv::Mat& target, double alpha, double beta) {
@@ -326,7 +325,18 @@ double ParametricLSystem::distance(const cv::Mat& indicator, const cv::Mat& targ
 		}
 	}
 
-	return dist;
+	return sqrt(dist);
+}
+
+/**
+ * indicatorのスコアを計算して返却する。
+ *
+ * @param indicator		indicator
+ * @param target		ターゲットindicator
+ * @return				距離
+ */
+double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target) {	
+	return 1.0 - sqrt(ml::mat_squared_sum(indicator - target)) / (double)indicator.rows / (double)indicator.cols;
 }
 
 /**
@@ -352,21 +362,22 @@ double ParametricLSystem::uct_traverse(Node* node, const cv::Mat& target) {
 		cout << "Expanded!!!!!" << endl;
 	}
 
-	double score;
+	double sc;
 	if (selected_child->children.size() == 0) {
 		cv::Mat indicator;
 		derive(selected_child->model, MAX_ITERATIONS_FOR_MC, indicator);
-		score = 10 * exp(-distance(indicator, target, ALPHA, BETA) * 0.01);
+		//sc = 10 * exp(-distance(indicator, target, ALPHA, BETA) * 0.01);
+		sc = score(indicator, target);
 	} else {
-		score = uct_traverse(selected_child, target);
+		sc = uct_traverse(selected_child, target);
 	}
 
-	selected_child->max_score = std::max(selected_child->max_score, score);
+	selected_child->max_score = std::max(selected_child->max_score, sc);
 	selected_child->num_visited++;
 
 	node->num_playout++;
 
-	return score;
+	return sc;
 }
 
 /**
@@ -379,9 +390,9 @@ double ParametricLSystem::uct_traverse(Node* node, const cv::Mat& target) {
  */
 double ParametricLSystem::uct(Node* node, int num_playout) {
 	if (node->num_visited == 0) {
-		return 10000 + ml::genRand(0, 100);
+		return 10000 + ml::genRand(0, 1000);
 	} else {
-		return node->max_score + PARAM_EXPLORATION * sqrt(log((double)num_playout) / node->num_visited);
+		return node->max_score + PARAM_EXPLORATION * sqrt(log((double)num_playout) / (double)node->num_visited / 5.0);
 	}
 }
 
