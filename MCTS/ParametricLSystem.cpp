@@ -136,11 +136,12 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
  * @return					生成されたモデル
  */
 String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
-	return derive(String(axiom, 0), random_seed, MAX_ITERATIONS, indicator);
+	ml::initRand(random_seed);
+	return derive(String(axiom, 0), MAX_ITERATIONS, indicator);
 }
 
 /**
- * 指定された開始モデルからスタートし、適当な乱数シードに基づいて、ランダムにgenerateする。
+ * 指定された開始モデルからスタートし、ランダムにgenerateする。
  *
  * @param start_model		開始モデル
  * @param random_seed		乱数シード
@@ -149,13 +150,13 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
  * @param indicator [OUT]	生成されたモデルのindicator
  * @return					生成されたモデル
  */
-String ParametricLSystem::derive(const String& start_model, int random_seed, int max_iterations, cv::Mat& indicator) {
-	ml::initRand(random_seed);
+String ParametricLSystem::derive(const String& start_model, int max_iterations, cv::Mat& indicator) {
+	//ml::initRand(random_seed);
 
 	String result = start_model;
 
-	//for (int iter = 0; iter < max_iterations; ++iter) {
-	for (int iter = 0; ; ++iter) {
+	for (int iter = 0; iter < max_iterations; ++iter) {
+	//for (int iter = 0; ; ++iter) {
 		// 展開するパラメータを決定
 		int i = findNextLiteralToDefineValue(result);
 
@@ -167,13 +168,14 @@ String ParametricLSystem::derive(const String& start_model, int random_seed, int
 
 			// もしmax_levelを超えたら、終了する
 			if (iter >= max_iterations) {
-				break;
+				//break;
 			}
 
 			result.replace(i, String(rules[result[i].c][index], result[i].level + 1));
 		} else if (result[i].c == 'F') {
 			double mean_val = grid_size * 0.5 / pow(1.5, result[i].level);
 			double val = ml::genRandInt(mean_val * 0.8, mean_val * 1.2, 3);
+			//double val = ml::genRandInt(grid_size * 0.5 / (result[i].level + 1) * 0.8, grid_size * 0.5 / (result[i].level + 1) * 1.2, 3);
 			result[i] = Literal(result[i].c, result[i].level, val);
 		} else if (result[i].c == '+' || result[i].c == '-') {
 			double val = ml::genRandInt(10, 60, 3);
@@ -261,7 +263,6 @@ void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indi
  * 指定されたターゲットindicatorに近いモデルを生成する。
  *
  * @param target			ターゲットindicator
- * @param threshold			しきい値
  * @param indicator [OUT]	生成されたモデルのindicator
  * @return					生成されたモデル
  */
@@ -293,7 +294,7 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
 		}
 		node = selected_child;
 
-		cout << l << ": " << node->max_score << endl;
+		//cout << l << ": " << node->max_score << endl;
 	}
 
 	computeIndicator(node->model, scale, indicator);
@@ -354,7 +355,7 @@ double ParametricLSystem::uct_traverse(Node* node, const cv::Mat& target) {
 	double score;
 	if (selected_child->children.size() == 0) {
 		cv::Mat indicator;
-		derive(selected_child->model, (int)ml::genRand(0, 10000), MAX_ITERATIONS_FOR_MC, indicator);
+		derive(selected_child->model, MAX_ITERATIONS_FOR_MC, indicator);
 		score = 10 * exp(-distance(indicator, target, ALPHA, BETA) * 0.01);
 	} else {
 		score = uct_traverse(selected_child, target);
@@ -479,10 +480,6 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
  * @reutnr			選択されたルール
  */
 int ParametricLSystem::chooseRule(const Literal& non_terminal) {
-	// uniform確率で、適用するルールを決定する
-	return rand() % rules[non_terminal.c].size();
-
-	/*
 	// ハードコーディング
 	// 深さ6を超えたら、X->Fとする
 	if (non_terminal.level > 6) return 0;
@@ -494,9 +491,8 @@ int ParametricLSystem::chooseRule(const Literal& non_terminal) {
 	} else {
 		return 1;
 	}
-	*/
 
-
+	// uniform確率で、適用するルールを決定する
 	//return rand() % rules[non_terminal.c].size();
 }
 

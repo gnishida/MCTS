@@ -27,22 +27,21 @@ void MainWindow::onRandomGeneration() {
 
 void MainWindow::onGreedyInverse() {
 	// ターゲットindicatorを読み込む
-	cv::Mat target_indicator = cv::imread("target_indicator.png", 0);
+	cv::Mat target_indicator = cv::imread("target_indicator2.png", 0);
 	target_indicator.convertTo(target_indicator, CV_32F, 1.0/255.0);
 	cv::flip(target_indicator, target_indicator, 0);
 
 	// 白黒を反転させる
 	target_indicator = 1 - target_indicator;
 
-	time_t start = clock();
-
 	// ターゲットに近いモデルを生成する
 	cv::Mat indicator;
+	time_t start = clock();
 	glWidget->model = glWidget->lsystem.inverse(target_indicator, indicator);
+	time_t end = clock();
 
 	cout << glWidget->model << endl;
 
-	time_t end = clock();
 	cout << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
 
 	// 生成したモデルの画像を保存する

@@ -85,7 +85,7 @@ public:
 	ParametricLSystem(int grid_size, float scale);
 	void draw(const String& model, std::vector<Vertex>& vertices);
 	String derive(int random_seed, cv::Mat& indicator);
-	String derive(const String& start_model, int random_seed, int max_iterations, cv::Mat& indicator);
+	String derive(const String& start_model, int max_iterations, cv::Mat& indicator);
 	void computeIndicator(String str, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target, cv::Mat& indicator);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);

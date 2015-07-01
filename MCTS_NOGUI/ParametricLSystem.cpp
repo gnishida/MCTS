@@ -298,7 +298,7 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
 		}
 		node = selected_child;
 
-		cout << l << ": " << node->max_score << endl;
+		//cout << l << ": " << node->max_score << endl;
 	}
 
 	computeIndicator(node->model, scale, indicator);

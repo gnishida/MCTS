@@ -15,16 +15,16 @@ int main() {
 	// 白黒を反転させる
 	target_indicator = 1 - target_indicator;
 
-	time_t start = clock();
 
 	// ターゲットに近いモデルを生成する
 	cv::Mat indicator;
 	parametriclsystem::ParametricLSystem lsystem(300, 0.1);
+	time_t start = clock();
 	parametriclsystem::String model = lsystem.inverse(target_indicator, indicator);
+	time_t end = clock();
 
 	cout << model << endl;
 
-	time_t end = clock();
 	cout << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
 
 	// 生成したモデルの画像を保存する
