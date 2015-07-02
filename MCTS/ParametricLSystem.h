@@ -97,7 +97,7 @@ public:
 
 	Node* addChild(const String& model, const Action& action);
 	Action randomlySelectAction();
-	Node* UCTSelectChild();
+	Node* UCTSelectChild(double param_exploration);
 };
 
 

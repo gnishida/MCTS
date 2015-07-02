@@ -150,7 +150,7 @@ Action Node::randomlySelectAction() {
 /**
  * UCTアルゴリズムに従い、子ノードを1つ選択する。
  */
-Node* Node::UCTSelectChild() {
+Node* Node::UCTSelectChild(double param_exploration) {
 	double max_uct = -std::numeric_limits<double>::max();
 	Node* best_child = NULL;
 
@@ -162,7 +162,7 @@ Node* Node::UCTSelectChild() {
 		if (children[i]->visits == 0) {
 			uct = 10000 + ml::genRand(0, 1000);
 		} else {
-			uct = children[i]->best_score + PARAM_EXPLORATION * sqrt(2 * log((double)visits) / (double)children[i]->visits);
+			uct = children[i]->best_score + param_exploration * sqrt(2 * log((double)visits) / (double)children[i]->visits);
 		}
 
 		if (uct > max_uct) {
@@ -384,7 +384,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 		// 探索木のリーフノードを選択
 		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
-			node = node->UCTSelectChild();
+			node = node->UCTSelectChild(PARAM_EXPLORATION);
 		}
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
@@ -408,9 +408,14 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 		}
 
 		// スコアをbackpropagateする
+		bool updated = false;
+		Node* leaf = node;
 		while (node != NULL) {
 			node->visits++;
-			node->best_score = std::max(node->best_score, sc);
+			if (sc > node->best_score) {
+				node->best_score = sc;
+				updated = true;
+			}
 
 			// 子ノードが全て展開済みで、且つ、スコア確定済みなら、このノードのスコアも確定とする
 			if (node->untriedActions.size() == 0) {
@@ -426,21 +431,15 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 			node = node->parent;
 		}
-	}
 
-	// ベストスコアの子ノードを返却する
-	double best_score = -std::numeric_limits<double>::max();
-	Node* best_child = NULL;
-	for (int i = 0; i < current_node->children.size(); ++i) {
-		if (current_node->children[i]->best_score > best_score) {
-			best_score = current_node->children[i]->best_score;
-			best_child = current_node->children[i];
+		// ベストスコアを更新した場合は、このderivation上のノードを全て実体化する
+		if (updated) {
+
 		}
 	}
 
-	cout << best_score << endl;
-
-	return best_child;
+	// ベストスコアの子ノードを返却する
+	return current_node->UCTSelectChild(0.0);
 }
 
 /**
@@ -459,7 +458,7 @@ Node* ParametricLSystem::UCT2(Node* current_node, const cv::Mat& target, int whi
 
 		// 探索木のリーフノードを選択
 		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
-			node = node->UCTSelectChild();
+			node = node->UCTSelectChild(PARAM_EXPLORATION);
 		}
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
@@ -504,20 +503,7 @@ Node* ParametricLSystem::UCT2(Node* current_node, const cv::Mat& target, int whi
 	}
 
 	// ベストスコアの子ノードを返却する
-	Node* node = current_node;
-	Node* best_child = NULL;
-	while (node->children.size() > 0) {
-		double best_score = -std::numeric_limits<double>::max();
-		for (int i = 0; i < node->children.size(); ++i) {
-			if (node->children[i]->best_score > best_score) {
-				best_score = node->children[i]->best_score;
-				best_child = node->children[i];
-			}
-		}
-		node = best_child;
-	}
-
-	return best_child;
+	return current_node->UCTSelectChild(0.0);
 }
 
 /**
