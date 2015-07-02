@@ -27,7 +27,7 @@ void MainWindow::onRandomGeneration() {
 
 void MainWindow::onGreedyInverse() {
 	// ターゲットindicatorを読み込む
-	cv::Mat target_indicator = cv::imread("target_indicator2.png", 0);
+	cv::Mat target_indicator = cv::imread("target_indicator.png", 0);
 	target_indicator.convertTo(target_indicator, CV_32F, 1.0/255.0);
 	cv::flip(target_indicator, target_indicator, 0);
 

@@ -14,7 +14,7 @@
 #define ALPHA								1.0
 #define BETA								1.0
 
-#define PARAM_EXPLORATION					0.01//0.3 //1
+#define PARAM_EXPLORATION					0.3 //1
 
 //#define DEBUG		1
 
