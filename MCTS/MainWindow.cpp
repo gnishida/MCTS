@@ -42,11 +42,16 @@ void MainWindow::onGreedyInverse() {
 
 	cout << glWidget->model << endl;
 
-	cout << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
+	cout << fixed << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
 
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
 	glWidget->lsystem.computeIndicator(glWidget->model, 1.0f, img);
+	/*
+	cv::resize(target_indicator, target_indicator, cv::Size(300, 300));
+	target_indicator.convertTo(target_indicator, CV_32F, 0.4);
+	img += target_indicator;
+	*/
 	ml::mat_save("result.png", img);
 
 	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);

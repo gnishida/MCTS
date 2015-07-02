@@ -57,18 +57,47 @@ public:
 ostream& operator<<(ostream& os, const String& dt);
 
 /**
+ * 1ステップのderiveを表す。
+ */
+class Action {
+public:
+	static enum { ACTION_RULE = 0, ACTION_VALUE };
+
+public:
+	int type;		// 0 -- rule / 1 -- value
+	int index;		// モデルの何文字目の変数に対するactionか？
+	string rule;
+	double value;
+
+public:
+	Action() {}
+	Action(int index, const string& rule);
+	Action(int index, double value);
+
+	String apply(const String& model);
+};
+
+/**
  * MCTS用のノードクラス
  */
 class Node {
 public:
-	double max_score;	// ベストスコア
+	double best_score;	// ベストスコア
+	Node* parent;
 	std::vector<Node*> children;
-	int num_visited;	// このノードの訪問回数
-	int num_playout;
+	std::vector<Action> untriedActions;
+	Action action;
+	int visits;			// このノードの訪問回数
 	parametriclsystem::String model;
+	bool fixed;
 
 public:
 	Node(const String& model);
+	Node(const String& model, const Action& action);
+
+	Node* addChild(const String& model, const Action& action);
+	Action randomlySelectAction();
+	Node* UCTSelectChild();
 };
 
 
@@ -88,17 +117,15 @@ public:
 	String derive(const String& start_model, int max_iterations, cv::Mat& indicator);
 	void computeIndicator(String str, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target, cv::Mat& indicator);
+	Node* UCT(Node* current_node, const cv::Mat& target);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);
 	double score(const cv::Mat& indicator, const cv::Mat& target);
 
-	// MCTS関係のメソッド
-	double uct_traverse(Node* node, const cv::Mat& target);
-	double uct(Node* node, int num_playout);
-	bool expand(Node* node);
-
 private:
+	void setUntriedActions(Node* node);
 	int findNextLiteralToDefineValue(const String& str);
 	int chooseRule(const Literal& non_terminal);
+	void releaseNodeMemory(Node* node);
 };
 
 float deg2rad(float deg);

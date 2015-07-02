@@ -8,14 +8,13 @@
 #include <QGLWidget>
 
 #define MAX_ITERATIONS						200
-#define MAX_ITERATIONS_FOR_MC				50
+#define MAX_ITERATIONS_FOR_MC				20
 #define NUM_MONTE_CARLO_SAMPLING			200
 
 #define ALPHA								1.0
 #define BETA								1.0
 
-#define CREATE_NEW_NODE_LIMIT				10000
-#define PARAM_EXPLORATION					0.44 //1.4142
+#define PARAM_EXPLORATION					0.01//0.3 //1
 
 //#define DEBUG		1
 
@@ -80,11 +79,99 @@ ostream& operator<<(ostream& os, const String& str) {
     return os;
 }
 
+Action::Action(int index, const string& rule) {
+	this->type = ACTION_RULE;
+	this->index = index;
+	this->rule = rule;
+}
+
+Action::Action(int index, double value) {
+	this->type = ACTION_VALUE;
+	this->index = index;
+	this->value = value;
+}
+
+/**
+ * 指定されたモデルに、このアクションを適用する。
+ */
+String Action::apply(const String& model) {
+	String new_model = model;
+
+	if (type == ACTION_RULE) {
+		new_model.replace(index, String(rule, model[index].level + 1));
+	} else {
+		new_model[index].param_value = value;
+		new_model[index].param_defined = true;
+	}
+
+	return new_model;
+}
+
 Node::Node(const String& model) {
+	this->parent = NULL;
 	this->model = model;
-	max_score = -std::numeric_limits<double>::max();
-	num_visited = 0;
-	num_playout = 0;
+	best_score = -std::numeric_limits<double>::max();
+	visits = 0;
+	fixed = false;
+}
+
+Node::Node(const String& model, const Action& action) {
+	this->parent = NULL;
+	this->model = model;
+	this->action = action;
+	best_score = -std::numeric_limits<double>::max();
+	visits = 0;
+	fixed = false;
+}
+
+/**
+ * ノードに、指定されたmodelの子ノードを追加する。
+ */
+Node* Node::addChild(const String& model, const Action& action) {
+	Node* child = new Node(model, action);
+	children.push_back(child);
+	child->parent = this;
+	return child;
+}
+
+/**
+ * untriedActionsから1つをランダムに選択して返却する。
+ * 選択されたactionは、リストから削除される。
+ *
+ * @return		選択されたaction
+ */
+Action Node::randomlySelectAction() {
+	int index = ml::genRand(0, untriedActions.size());
+	Action action = untriedActions[index];
+	untriedActions.erase(untriedActions.begin() + index);
+	return action;
+}
+
+/**
+ * UCTアルゴリズムに従い、子ノードを1つ選択する。
+ */
+Node* Node::UCTSelectChild() {
+	double max_uct = -std::numeric_limits<double>::max();
+	Node* best_child = NULL;
+
+	for (int i = 0; i < children.size(); ++i) {
+		// スコアが確定済みの子ノードは探索対象外とする
+		if (children[i]->fixed) continue;
+
+		double uct;
+		if (children[i]->visits == 0) {
+			uct = 10000 + ml::genRand(0, 1000);
+		} else {
+			uct = children[i]->best_score + PARAM_EXPLORATION * sqrt(2 * log((double)visits) / (double)children[i]->visits);
+		}
+
+		if (uct > max_uct) {
+			max_uct = uct;
+			best_child = children[i];
+		}
+	}
+
+	return best_child;
 }
 
 ParametricLSystem::ParametricLSystem(int grid_size, float scale) {
@@ -267,39 +354,98 @@ void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indi
  * @return					生成されたモデル
  */
 String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
-	// ルートノードの作成
-	Node* root = new Node(String(axiom, 0));
+	String model(axiom, 0);
+	Node* root = new Node(model);
+	setUntriedActions(root);
 
 	Node* node = root;
 
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
-		// 子ノードがまだない場合は、expand
-		if (node->children.size() == 0) {
-			if (!expand(node)) break;
-		}
+		// もしノードがリーフノードなら、終了
+		if (node->untriedActions.size() == 0 && node->children.size() == 0) break;
 
-		// playoutを実施
-		for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
-			uct_traverse(node, target);
-		}
-
-		// ハイスコアの子ノードを選択
-		double max_score = 0;
-		Node* selected_child = NULL;
-		for (int i = 0; i < node->children.size(); ++i) {
-			if (node->children[i]->max_score > max_score) {
-				max_score = node->children[i]->max_score;
-				selected_child = node->children[i];
-			}
-		}
-		node = selected_child;
-
-		//cout << l << ": " << node->max_score << endl;
+		node = UCT(node, target);
 	}
 
-	computeIndicator(node->model, scale, indicator);
+	model = node->model;
 
-	return node->model;
+	// ノードのメモリを解法
+	releaseNodeMemory(root);
+
+	return model;
+}
+
+/**
+ * 指定されたmodelからUCTをスタートし、最善のoptionを返却する。
+ *
+ * @param model		モデル
+ * @param target	ターゲット
+ * @return			最善のoption
+ */
+Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target) {
+	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
+		// 現在のノードのスコアが確定したら、終了
+		if (current_node->fixed) break;
+
+		Node* node = current_node;
+
+		// 探索木のリーフノードを選択
+		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
+			node = node->UCTSelectChild();
+		}
+
+		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
+		if (node->untriedActions.size() > 0) {
+			Action action = node->randomlySelectAction();
+			String child_model = action.apply(node->model);
+
+			node = node->addChild(child_model, action);
+			setUntriedActions(node);
+		}
+
+		// ランダムにderiveする
+		cv::Mat indicator;
+		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator);
+
+		double sc = score(indicator, target);
+
+		// スコア確定なら、マークをつける
+		if (node->untriedActions.size() == 0 && node->children.size() == 0) {
+			node->fixed = true;
+		}
+
+		// スコアをbackpropagateする
+		while (node != NULL) {
+			node->visits++;
+			node->best_score = std::max(node->best_score, sc);
+
+			// 子ノードが全て展開済みで、且つ、スコア確定済みなら、このノードのスコアも確定とする
+			if (node->untriedActions.size() == 0) {
+				bool fixed = true;
+				for (int c = 0; c < node->children.size(); ++c) {
+					if (!node->children[c]->fixed) {
+						fixed = false;
+						break;
+					}
+				}
+				node->fixed = fixed;
+			}
+
+			node = node->parent;
+		}
+	}
+
+	// ベストスコアの子ノードを返却する
+	double best_score = -std::numeric_limits<double>::max();
+	Node* best_child = NULL;
+	for (int i = 0; i < current_node->children.size(); ++i) {
+		if (current_node->children[i]->best_score > best_score) {
+			best_score = current_node->children[i]->best_score;
+			best_child = current_node->children[i];
+		}
+	}
+
+	return best_child;
 }
 
 /**
@@ -339,114 +485,28 @@ double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target)
 	return 1.0 - sqrt(ml::mat_squared_sum(indicator - target)) / (double)indicator.rows / (double)indicator.cols;
 }
 
-/**
- * 指定されたノードから、UCTに基づいて1つの子ノードを選択し、再帰的にtraverseし、探索木を構築していく。
- */
-double ParametricLSystem::uct_traverse(Node* node, const cv::Mat& target) {
-	// UCT値が最大のノードを選択する
-	double max_uct = 0;
-	Node* selected_child = NULL;
-
-	// UCTアルゴリズムで、子ノードを1つ選択する
-	for (int i = 0; i < node->children.size(); ++i) {
-		float uct_value = uct(node->children[i], node->num_playout);
-		if (uct_value > max_uct) {
-			max_uct = uct_value;
-			selected_child = node->children[i];
-		}
-	}
-
-	// 子ノードへの訪問数がしきい値を超えたら、子ノードを探索木に追加する
-	if (selected_child != NULL && selected_child->num_visited >= CREATE_NEW_NODE_LIMIT) {
-		expand(selected_child);
-		cout << "Expanded!!!!!" << endl;
-	}
-
-	double sc;
-	if (selected_child->children.size() == 0) {
-		cv::Mat indicator;
-		derive(selected_child->model, MAX_ITERATIONS_FOR_MC, indicator);
-		//sc = 10 * exp(-distance(indicator, target, ALPHA, BETA) * 0.01);
-		sc = score(indicator, target);
-	} else {
-		sc = uct_traverse(selected_child, target);
-	}
-
-	selected_child->max_score = std::max(selected_child->max_score, sc);
-	selected_child->num_visited++;
-
-	node->num_playout++;
-
-	return sc;
-}
-
-/**
- * UCT値: max_score + c sqrt(ln(n) / n_i) を返却する。
- * ただし、n_i=0の時は、上記関数は∞となり、プログラムではエラーとなるので、代わりに10000 + rand(100)を返す。
- *
- * @param node			ノード
- * @param num_playout	playout回数
- * @return				指定されたノードのUCT値
- */
-double ParametricLSystem::uct(Node* node, int num_playout) {
-	if (node->num_visited == 0) {
-		return 10000 + ml::genRand(0, 1000);
-	} else {
-		return node->max_score + PARAM_EXPLORATION * sqrt(log((double)num_playout) / (double)node->num_visited / 5.0);
-	}
-}
-
-/**
- * 指定されたノードの子ノードを全て追加する。
- *
- * @param node		ノード
- * @return			true - 成功 / false - ノードがリーフノードのため、これ以上展開できない
- */
-bool ParametricLSystem::expand(Node* node) {
+void ParametricLSystem::setUntriedActions(Node* node) {
 	// 展開するパラメータを決定
 	int i = findNextLiteralToDefineValue(node->model);
 
 	// 新たなderivationがないなら、終了
-	if (i == -1) return false;
+	if (i == -1) return;
 
 	if (rules.find(node->model[i].c) != rules.end()) {
 		for (int k = 0; k < rules[node->model[i].c].size(); ++k) {
-			// この値を選択した時のモデルを作成
-			String model = node->model;
-			model.replace(i, String(rules[model[i].c][k], model[i].level + 1));
-
-			// 子ノードを作成
-			Node* child = new Node(model);
-			node->children.push_back(child);
+			node->untriedActions.push_back(Action(i, rules[node->model[i].c][k]));
 		}
 	} else if (node->model[i].c == 'F') {
 		for (int k = 0; k < 3; ++k) {
-			double mean_val = grid_size * 0.5 / pow(1.5, node->model[i].level);
-			double val = mean_val * (0.8 + k * 0.2);
-
-			// この値を選択した時のモデルを生成
-			String model = node->model;
-			model[i] = Literal(model[i].c, model[i].level, val);
-
-			// 子ノードを作成
-			Node* child = new Node(model);
-			node->children.push_back(child);
+			double val = grid_size * 0.5 / (node->model[i].level + 1) * (0.8 + 0.2 * k);
+			node->untriedActions.push_back(Action(i, val));
 		}
-	} else if (node->model[i].c == '-' || node->model[i].c == '+') {
+	} else if (node->model[i].c == '+' || node->model[i].c == '-') {
 		for (int k = 0; k < 3; ++k) {
 			double val = k * 25.0 + 10.0;
-
-			// この値を選択した時のモデルを生成
-			String model = node->model;
-			model[i] = Literal(model[i].c, model[i].level, val);
-
-			// 子ノードを作成
-			Node* child = new Node(model);
-			node->children.push_back(child);
+			node->untriedActions.push_back(Action(i, val));
 		}
 	}
-
-	return true;
 }
 
 /**
@@ -505,6 +565,13 @@ int ParametricLSystem::chooseRule(const Literal& non_terminal) {
 
 	// uniform確率で、適用するルールを決定する
 	//return rand() % rules[non_terminal.c].size();
+}
+
+void ParametricLSystem::releaseNodeMemory(Node* node) {
+	for (int i = 0; i < node->children.size(); ++i) {
+		releaseNodeMemory(node->children[i]);
+	}
+	delete node;
 }
 
 float deg2rad(float deg) {
