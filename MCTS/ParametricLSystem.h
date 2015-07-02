@@ -116,7 +116,7 @@ public:
 	String derive(int random_seed, cv::Mat& indicator);
 	String derive(const String& start_model, int max_iterations, cv::Mat& indicator);
 	void computeIndicator(String str, float scale, cv::Mat& indicator);
-	String inverse(const cv::Mat& target, cv::Mat& indicator);
+	String inverse(const cv::Mat& target);
 	Node* UCT(Node* current_node, const cv::Mat& target, int white_count);
 	Node* UCT2(Node* current_node, const cv::Mat& target, int white_count);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);

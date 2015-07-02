@@ -203,10 +203,14 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			if (model[i].param_defined) {
 				double length = model[i].param_value;
 			
-				// 線を描画する
-				std::vector<Vertex> new_vertices;
-				glutils::drawSphere(glm::vec3(0, 0, 0), 1, glm::vec3(1, 1, 1), modelMat, vertices);
-				glutils::drawCylinder(glm::vec3(0, 0, 0), length, 1, glm::vec3(1, 1, 1), glm::rotate(modelMat, deg2rad(-90), glm::vec3(1, 0, 0)), vertices);
+				glm::vec4 p(0, 0, 0, 1);
+				p = modelMat * p;
+				if (p.x >= -grid_size * 0.5 && p.x < grid_size * 0.5 && p.y >= 0 && p.y < grid_size) { // hack: 領域の外は描画しない
+					// 線を描画する
+					std::vector<Vertex> new_vertices;
+					glutils::drawSphere(glm::vec3(0, 0, 0), 1, glm::vec3(1, 1, 1), modelMat, vertices);
+					glutils::drawCylinder(glm::vec3(0, 0, 0), length, 1, glm::vec3(1, 1, 1), glm::rotate(modelMat, deg2rad(-90), glm::vec3(1, 0, 0)), vertices);
+				}
 
 				modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
 			}
@@ -331,7 +335,7 @@ void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indi
  * @param indicator [OUT]	生成されたモデルのindicator
  * @return					生成されたモデル
  */
-String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
+String ParametricLSystem::inverse(const cv::Mat& target) {
 	// 白色のピクセルの数をカウント
 	int count = 0;
 	for (int r = 0; r < target.rows; ++r) {
@@ -342,13 +346,11 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
 		}
 	}
 
-
 	String model(axiom, 0);
 	Node* root = new Node(model);
 	root->untriedActions = getActions(model);
 
 	Node* node = root;
-
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
 		// もしノードがリーフノードなら、終了
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) break;
