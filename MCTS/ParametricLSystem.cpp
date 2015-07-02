@@ -8,7 +8,7 @@
 #include <QGLWidget>
 
 #define MAX_ITERATIONS						200
-#define MAX_ITERATIONS_FOR_MC				20
+#define MAX_ITERATIONS_FOR_MC				50
 #define NUM_MONTE_CARLO_SAMPLING			200
 
 #define ALPHA								1.0
@@ -265,7 +265,7 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
  * @param scale				grid_size * scaleのサイズでindicatorを計算する
  * @param indicator [OUT]	indicator
  */
-void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indicator) {
+void ParametricLSystem::computeIndicator(const String& model, float scale, cv::Mat& indicator) {
 	int size = grid_size * scale;
 
 	indicator = cv::Mat::zeros(size, size, CV_32F);
@@ -274,55 +274,36 @@ void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indi
 
 	glm::mat4 modelMat;
 
-	for (int i = 0; i < rule.length(); ++i) {
-		if (rule[i].c == '[') {
+	for (int i = 0; i < model.length(); ++i) {
+		if (model[i].c == '[') {
 			stack.push_back(modelMat);
-		} else if (rule[i].c == ']') {
+		} else if (model[i].c == ']') {
 			modelMat = stack.back();
 			stack.pop_back();
-		} else if (rule[i].c == '+') {
-			modelMat = glm::rotate(modelMat, deg2rad(rule[i].param_value), glm::vec3(0, 0, 1));
-		} else if (rule[i].c == '-') {
-			modelMat = glm::rotate(modelMat, deg2rad(-rule[i].param_value), glm::vec3(0, 0, 1));
-		} else if (rule[i].c == 'F') {
-			double length;
-			if (rule[i].param_defined) {
-				length = rule[i].param_value * scale;
-			} else {
-				length = 5.0;
+		} else if (model[i].c == '+') {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_value), glm::vec3(0, 0, 1));
+		} else if (model[i].c == '-') {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_value), glm::vec3(0, 0, 1));
+		} else if (model[i].c == 'F') {
+			if (model[i].param_defined) {
+				double length = model[i].param_value * scale;
+			
+				// 線を描画する代わりに、indicatorを更新する
+				glm::vec4 p1(0, 0, 0, 1);
+				glm::vec4 p2(0, length, 0, 1);
+				p1 = modelMat * p1;
+				p2 = modelMat * p2;
+				int u1 = p1.x + size * 0.5;
+				int v1 = p1.y;
+				int u2 = p2.x + size * 0.5;
+				int v2 = p2.y;
+
+				int thickness = max(1.0, 3.0 * scale);
+				cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
+
+				modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
 			}
-			
-			// 線を描画する代わりに、indicatorを更新する
-			glm::vec4 p1(0, 0, 0, 1);
-			glm::vec4 p2(0, length, 0, 1);
-			p1 = modelMat * p1;
-			p2 = modelMat * p2;
-			int u1 = p1.x + size * 0.5;
-			int v1 = p1.y;
-			int u2 = p2.x + size * 0.5;
-			int v2 = p2.y;
-
-			int thickness = max(1.0, 3.0 * scale);
-			cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
-
-			modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
-		} else if (rule[i].c == 'X') {
-			double length = 3.0;
-			
-			// 線を描画する代わりに、indicatorを更新する
-			glm::vec4 p1(0, 0, 0, 1);
-			glm::vec4 p2(0, length, 0, 1);
-			p1 = modelMat * p1;
-			p2 = modelMat * p2;
-			int u1 = p1.x + size * 0.5;
-			int v1 = p1.y;
-			int u2 = p2.x + size * 0.5;
-			int v2 = p2.y;
-
-			int thickness = max(1.0, 3.0 * scale);
-			cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
-
-			modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
+		} else if (model[i].c == 'X') {
 		} else {
 		}
 	}
