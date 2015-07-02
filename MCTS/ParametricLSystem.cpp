@@ -14,7 +14,7 @@
 #define ALPHA								1.0
 #define BETA								1.0
 
-#define PARAM_EXPLORATION					0.3 //1
+#define PARAM_EXPLORATION					1 //1
 
 //#define DEBUG		1
 
@@ -238,42 +238,20 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
  * @return					生成されたモデル
  */
 String ParametricLSystem::derive(const String& start_model, int max_iterations, cv::Mat& indicator) {
-	//ml::initRand(random_seed);
-
-	String result = start_model;
+	String model = start_model;
 
 	for (int iter = 0; iter < max_iterations; ++iter) {
-	//for (int iter = 0; ; ++iter) {
-		// 展開するパラメータを決定
-		int i = findNextLiteralToDefineValue(result);
+		std::vector<Action> actions = getActions(model);
+		if (actions.size() == 0) break;
 
-		// 新たなderivationがないなら、終了
-		if (i == -1) break;
-
-		if (rules.find(result[i].c) != rules.end()) {
-			int index = chooseRule(result[i]);
-
-			// もしmax_levelを超えたら、終了する
-			if (iter >= max_iterations) {
-				//break;
-			}
-
-			result.replace(i, String(rules[result[i].c][index], result[i].level + 1));
-		} else if (result[i].c == 'F') {
-			double mean_val = grid_size * 0.5 / pow(1.5, result[i].level);
-			double val = ml::genRandInt(mean_val * 0.8, mean_val * 1.2, 3);
-			//double val = ml::genRandInt(grid_size * 0.5 / (result[i].level + 1) * 0.8, grid_size * 0.5 / (result[i].level + 1) * 1.2, 3);
-			result[i] = Literal(result[i].c, result[i].level, val);
-		} else if (result[i].c == '+' || result[i].c == '-') {
-			double val = ml::genRandInt(10, 60, 3);
-			result[i] = Literal(result[i].c, result[i].level, val);
-		}
+		int index = ml::genRand(0, actions.size());
+		model = actions[index].apply(model);
 	}
 
 	// indicatorを計算する
-	computeIndicator(result, scale, indicator);
+	computeIndicator(model, scale, indicator);
 
-	return result;
+	return model;
 }
 
 /**
@@ -354,9 +332,20 @@ void ParametricLSystem::computeIndicator(String rule, float scale, cv::Mat& indi
  * @return					生成されたモデル
  */
 String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
+	// 白色のピクセルの数をカウント
+	int count = 0;
+	for (int r = 0; r < target.rows; ++r) {
+		for (int c = 0; c < target.cols; ++c) {
+			if (ml::mat_get_value(target, r, c) > 0.5) {
+				count++;
+			}
+		}
+	}
+
+
 	String model(axiom, 0);
 	Node* root = new Node(model);
-	setUntriedActions(root);
+	root->untriedActions = getActions(model);
 
 	Node* node = root;
 
@@ -364,8 +353,10 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
 		// もしノードがリーフノードなら、終了
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) break;
 
-		node = UCT(node, target);
+		node = UCT(node, target, count);
 	}
+
+	//node = UCT2(node, target, count);
 
 	model = node->model;
 
@@ -382,7 +373,7 @@ String ParametricLSystem::inverse(const cv::Mat& target, cv::Mat& indicator) {
  * @param target	ターゲット
  * @return			最善のoption
  */
-Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target) {
+Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int white_count) {
 	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
 		// 現在のノードのスコアが確定したら、終了
 		if (current_node->fixed) break;
@@ -400,14 +391,14 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target) {
 			String child_model = action.apply(node->model);
 
 			node = node->addChild(child_model, action);
-			setUntriedActions(node);
+			node->untriedActions = getActions(child_model);
 		}
 
 		// ランダムにderiveする
 		cv::Mat indicator;
 		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator);
 
-		double sc = score(indicator, target);
+		double sc = score(indicator, target, white_count);
 
 		// スコア確定なら、マークをつける
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) {
@@ -443,6 +434,85 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target) {
 			best_score = current_node->children[i]->best_score;
 			best_child = current_node->children[i];
 		}
+	}
+
+	cout << best_score << endl;
+
+	return best_child;
+}
+
+/**
+ * 指定されたmodelからUCTをスタートし、最善のoptionを返却する。
+ *
+ * @param model		モデル
+ * @param target	ターゲット
+ * @return			最善のoption
+ */
+Node* ParametricLSystem::UCT2(Node* current_node, const cv::Mat& target, int white_count) {
+	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
+		// 現在のノードのスコアが確定したら、終了
+		if (current_node->fixed) break;
+
+		Node* node = current_node;
+
+		// 探索木のリーフノードを選択
+		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
+			node = node->UCTSelectChild();
+		}
+
+		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
+		if (node->untriedActions.size() > 0) {
+			Action action = node->randomlySelectAction();
+			String child_model = action.apply(node->model);
+
+			node = node->addChild(child_model, action);
+			node->untriedActions = getActions(child_model);
+		}
+
+		// ランダムにderiveする
+		cv::Mat indicator;
+		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator);
+
+		double sc = score(indicator, target, white_count);
+
+		// スコア確定なら、マークをつける
+		if (node->untriedActions.size() == 0 && node->children.size() == 0) {
+			node->fixed = true;
+		}
+
+		// スコアをbackpropagateする
+		while (node != NULL) {
+			node->visits++;
+			node->best_score = std::max(node->best_score, sc);
+
+			// 子ノードが全て展開済みで、且つ、スコア確定済みなら、このノードのスコアも確定とする
+			if (node->untriedActions.size() == 0) {
+				bool fixed = true;
+				for (int c = 0; c < node->children.size(); ++c) {
+					if (!node->children[c]->fixed) {
+						fixed = false;
+						break;
+					}
+				}
+				node->fixed = fixed;
+			}
+
+			node = node->parent;
+		}
+	}
+
+	// ベストスコアの子ノードを返却する
+	Node* node = current_node;
+	Node* best_child = NULL;
+	while (node->children.size() > 0) {
+		double best_score = -std::numeric_limits<double>::max();
+		for (int i = 0; i < node->children.size(); ++i) {
+			if (node->children[i]->best_score > best_score) {
+				best_score = node->children[i]->best_score;
+				best_child = node->children[i];
+			}
+		}
+		node = best_child;
 	}
 
 	return best_child;
@@ -481,32 +551,39 @@ double ParametricLSystem::distance(const cv::Mat& indicator, const cv::Mat& targ
  * @param target		ターゲットindicator
  * @return				距離
  */
-double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target) {	
-	return 1.0 - sqrt(ml::mat_squared_sum(indicator - target)) / (double)indicator.rows / (double)indicator.cols;
+double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target, int white_count) {
+	//return 1.0 - ml::mat_squared_sum(indicator - target) / (double)indicator.rows / (double)indicator.cols;
+	return 1.0 - ml::mat_squared_sum(indicator - target) / white_count;
 }
 
-void ParametricLSystem::setUntriedActions(Node* node) {
+std::vector<Action> ParametricLSystem::getActions(const String& model) {
+	std::vector<Action> actions;
+
 	// 展開するパラメータを決定
-	int i = findNextLiteralToDefineValue(node->model);
+	int i = findNextLiteralToDefineValue(model);
 
 	// 新たなderivationがないなら、終了
-	if (i == -1) return;
+	if (i == -1) return actions;
 
-	if (rules.find(node->model[i].c) != rules.end()) {
-		for (int k = 0; k < rules[node->model[i].c].size(); ++k) {
-			node->untriedActions.push_back(Action(i, rules[node->model[i].c][k]));
+	if (rules.find(model[i].c) != rules.end()) {
+		for (int k = 0; k < rules[model[i].c].size(); ++k) {
+			actions.push_back(Action(i, rules[model[i].c][k]));
 		}
-	} else if (node->model[i].c == 'F') {
+	} else if (model[i].c == 'F') {
 		for (int k = 0; k < 3; ++k) {
-			double val = grid_size * 0.5 / (node->model[i].level + 1) * (0.8 + 0.2 * k);
-			node->untriedActions.push_back(Action(i, val));
+			//double mean_val = grid_size * 0.5 / pow(1.5, model[i].level);
+			//double val = mean_val * (0.8 + 0.2 * k);
+			double val = grid_size * 0.5 / (model[i].level + 1) * (0.8 + 0.2 * k);
+			actions.push_back(Action(i, val));
 		}
-	} else if (node->model[i].c == '+' || node->model[i].c == '-') {
+	} else if (model[i].c == '+' || model[i].c == '-') {
 		for (int k = 0; k < 3; ++k) {
 			double val = k * 25.0 + 10.0;
-			node->untriedActions.push_back(Action(i, val));
+			actions.push_back(Action(i, val));
 		}
 	}
+
+	return actions;
 }
 
 /**
@@ -541,30 +618,6 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
 	} else {
 		return min_index2;
 	}
-}
-
-/**
- * ルールリストから、確率に基づいて１つのルールを選択する。
- * リストの各要素は、<確率、ルール>のペアとなっている。
- *
- * @param rules		ルールリスト
- * @reutnr			選択されたルール
- */
-int ParametricLSystem::chooseRule(const Literal& non_terminal) {
-	// ハードコーディング
-	// 深さ6を超えたら、X->Fとする
-	if (non_terminal.level > 6) return 0;
-
-	// ハードコーディング
-	// 深さ/6 の確率で、X->Fとする
-	if (rand() % 6 <= non_terminal.level) {
-		return 0;
-	} else {
-		return 1;
-	}
-
-	// uniform確率で、適用するルールを決定する
-	//return rand() % rules[non_terminal.c].size();
 }
 
 void ParametricLSystem::releaseNodeMemory(Node* node) {
