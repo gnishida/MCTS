@@ -85,7 +85,8 @@ public:
 	double best_score;	// ベストスコア
 	Node* parent;
 	std::vector<Node*> children;
-	std::vector<Action> untriedActions;
+	std::vector<Action> actions;
+	std::vector<int> untriedActions;
 	Action action;
 	int visits;			// このノードの訪問回数
 	parametriclsystem::String model;
@@ -96,7 +97,9 @@ public:
 	Node(const String& model, const Action& action);
 
 	Node* addChild(const String& model, const Action& action);
+	void setActions(std::vector<Action>& actions);
 	Action randomlySelectAction();
+	void removeAction(int index);
 	Node* UCTSelectChild(double param_exploration);
 };
 
@@ -114,7 +117,7 @@ public:
 	ParametricLSystem(int grid_size, float scale);
 	void draw(const String& model, std::vector<Vertex>& vertices);
 	String derive(int random_seed, cv::Mat& indicator);
-	String derive(const String& start_model, int max_iterations, cv::Mat& indicator);
+	String derive(const String& start_model, int max_iterations, cv::Mat& indicator, std::vector<int>& derivation_history);
 	void computeIndicator(const String& model, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);
 	Node* UCT(Node* current_node, const cv::Mat& target, int white_count);

@@ -8,19 +8,18 @@ using namespace std;
 
 int main() {
 	// ターゲットindicatorを読み込む
-	cv::Mat target_indicator = cv::imread("target_indicator.png", 0);
-	target_indicator.convertTo(target_indicator, CV_32F, 1.0/255.0);
-	cv::flip(target_indicator, target_indicator, 0);
+	cv::Mat target = cv::imread("target_indicator2.png", 0);
+	target.convertTo(target, CV_32F, 1.0/255.0);
+	cv::flip(target, target, 0);
 
 	// 白黒を反転させる
-	target_indicator = 1 - target_indicator;
+	target = 1 - target;
 
 
 	// ターゲットに近いモデルを生成する
-	cv::Mat indicator;
 	parametriclsystem::ParametricLSystem lsystem(300, 0.1);
 	time_t start = clock();
-	parametriclsystem::String model = lsystem.inverse(target_indicator, indicator);
+	parametriclsystem::String model = lsystem.inverse(target);
 	time_t end = clock();
 
 	cout << model << endl;
@@ -30,5 +29,8 @@ int main() {
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
 	lsystem.computeIndicator(model, 1.0f, img);
+	cv::resize(target, target, cv::Size(300, 300));
+	target.convertTo(target, CV_32F, 0.4);
+	img += target;
 	ml::mat_save("result.png", img);
 }

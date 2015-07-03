@@ -134,6 +134,13 @@ Node* Node::addChild(const String& model, const Action& action) {
 	return child;
 }
 
+void Node::setActions(std::vector<Action>& actions) {
+	this->actions = actions;
+	for (int i = 0; i < actions.size(); ++i) {
+		untriedActions.push_back(i);
+	}
+}
+
 /**
  * untriedActionsから1つをランダムに選択して返却する。
  * 選択されたactionは、リストから削除される。
@@ -142,9 +149,21 @@ Node* Node::addChild(const String& model, const Action& action) {
  */
 Action Node::randomlySelectAction() {
 	int index = ml::genRand(0, untriedActions.size());
-	Action action = untriedActions[index];
+	Action action = actions[untriedActions[index]];
 	untriedActions.erase(untriedActions.begin() + index);
 	return action;
+}
+
+/**
+ * untriedActionsの中で、指定されたindex値を持つ要素を削除する。
+ */
+void Node::removeAction(int index) {
+	for (int i = 0; i < untriedActions.size(); ++i) {
+		if (untriedActions[i] == index) {
+			untriedActions.erase(untriedActions.begin() + i);
+			return;
+		}
+	}
 }
 
 /**
@@ -156,7 +175,7 @@ Node* Node::UCTSelectChild(double param_exploration) {
 
 	for (int i = 0; i < children.size(); ++i) {
 		// スコアが確定済みの子ノードは探索対象外とする
-		if (children[i]->fixed) continue;
+		if (param_exploration > 0.0 && children[i]->fixed) continue;
 
 		double uct;
 		if (children[i]->visits == 0) {
@@ -227,8 +246,10 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
  * @return					生成されたモデル
  */
 String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
+	std::vector<int> derivation_history;
+
 	ml::initRand(random_seed);
-	return derive(String(axiom, 0), MAX_ITERATIONS, indicator);
+	return derive(String(axiom, 0), MAX_ITERATIONS, indicator, derivation_history);
 }
 
 /**
@@ -241,7 +262,7 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
  * @param indicator [OUT]	生成されたモデルのindicator
  * @return					生成されたモデル
  */
-String ParametricLSystem::derive(const String& start_model, int max_iterations, cv::Mat& indicator) {
+String ParametricLSystem::derive(const String& start_model, int max_iterations, cv::Mat& indicator, std::vector<int>& derivation_history) {
 	String model = start_model;
 
 	for (int iter = 0; iter < max_iterations; ++iter) {
@@ -249,6 +270,7 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
 		if (actions.size() == 0) break;
 
 		int index = ml::genRand(0, actions.size());
+		derivation_history.push_back(index);
 		model = actions[index].apply(model);
 	}
 
@@ -327,9 +349,10 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 		}
 	}
 
+	// UCTを使って探索木を構築していく
 	String model(axiom, 0);
 	Node* root = new Node(model);
-	root->untriedActions = getActions(model);
+	root->setActions(getActions(model));
 
 	Node* node = root;
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
@@ -337,6 +360,13 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) break;
 
 		node = UCT(node, target, count);
+
+		cout << l << ": " << node->best_score << endl;
+	}
+
+	// ベストスコアの子孫を辿ってリーフノードまで行く
+	while (node->children.size() > 0) {
+		node = node->UCTSelectChild(0.0);
 	}
 
 	//node = UCT2(node, target, count);
@@ -345,6 +375,11 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 
 	// ノードのメモリを解法
 	releaseNodeMemory(root);
+
+	// スコア表示
+	cv::Mat indicator;
+	computeIndicator(model, scale, indicator);
+	cout << score(indicator, target, count) << endl;
 
 	return model;
 }
@@ -374,16 +409,19 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 			String child_model = action.apply(node->model);
 
 			node = node->addChild(child_model, action);
-			node->untriedActions = getActions(child_model);
+			node->setActions(getActions(child_model));
 		}
 
 		// ランダムにderiveする
 		cv::Mat indicator;
-		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator);
+		std::vector<int> derivation_history;
+		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator, derivation_history);
 
+		// スコアを計算する
 		double sc = score(indicator, target, white_count);
+		node->best_score = sc;
 
-		// スコア確定なら、マークをつける
+		// リーフノードなら、スコアを確定する
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) {
 			node->fixed = true;
 		}
@@ -415,7 +453,22 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 		// ベストスコアを更新した場合は、このderivation上のノードを全て実体化する
 		if (updated) {
+			Node* node = leaf;
+			for (int di = 0; di < derivation_history.size(); ++di) {
+				node->removeAction(derivation_history[di]);
 
+				String child_model = node->actions[derivation_history[di]].apply(node->model);
+
+				node = node->addChild(child_model, node->actions[derivation_history[di]]);
+				node->setActions(getActions(child_model));
+				node->visits = 1;
+				node->best_score = sc;
+				
+				// リーフノードなら、スコアを確定する
+				if (node->untriedActions.size() == 0 && node->children.size() == 0) {
+					node->fixed = true;
+				}
+			}
 		}
 	}
 
@@ -448,21 +501,26 @@ Node* ParametricLSystem::UCT2(Node* current_node, const cv::Mat& target, int whi
 			String child_model = action.apply(node->model);
 
 			node = node->addChild(child_model, action);
-			node->untriedActions = getActions(child_model);
+			node->setActions(getActions(child_model));
 		}
 
 		// ランダムにderiveする
 		cv::Mat indicator;
-		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator);
+		std::vector<int> derivation_history;
+		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator, derivation_history);
 
+		// スコアを計算する
 		double sc = score(indicator, target, white_count);
+		node->best_score = sc;
 
-		// スコア確定なら、マークをつける
+		// リーフノードなら、スコアを確定する
 		if (node->untriedActions.size() == 0 && node->children.size() == 0) {
 			node->fixed = true;
 		}
 
 		// スコアをbackpropagateする
+		bool updated = false;
+		Node* leaf = node;
 		while (node != NULL) {
 			node->visits++;
 			node->best_score = std::max(node->best_score, sc);
