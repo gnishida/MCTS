@@ -15,6 +15,7 @@ int main() {
 	// 白黒を反転させる
 	target = 1 - target;
 
+	srand(6234);
 
 	// ターゲットに近いモデルを生成する
 	parametriclsystem::ParametricLSystem lsystem(300, 0.1);

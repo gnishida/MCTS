@@ -83,6 +83,7 @@ public:
 class Node {
 public:
 	double best_score;	// ベストスコア
+	std::vector<double> scores;
 	Node* parent;
 	std::vector<Node*> children;
 	std::vector<Action> actions;
@@ -100,7 +101,8 @@ public:
 	void setActions(std::vector<Action>& actions);
 	Action randomlySelectAction();
 	void removeAction(int index);
-	Node* UCTSelectChild(double param_exploration);
+	Node* UCTSelectChild();
+	Node* bestChild();
 };
 
 
@@ -120,7 +122,6 @@ public:
 	void computeIndicator(const String& model, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);
 	Node* UCT(Node* current_node, const cv::Mat& target, int white_count);
-	Node* UCT2(Node* current_node, const cv::Mat& target, int white_count);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);
 	double score(const cv::Mat& indicator, const cv::Mat& target, int white_count);
 
