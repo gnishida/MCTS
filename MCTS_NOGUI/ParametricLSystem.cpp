@@ -6,15 +6,16 @@
 #include "GLUtils.h"
 #include <list>
 
-#define MAX_ITERATIONS						50
+#define MAX_ITERATIONS						100
 #define MAX_ITERATIONS_FOR_MC				50
-#define NUM_MONTE_CARLO_SAMPLING			200
-#define MAX_LEVEL							5
+#define NUM_MONTE_CARLO_SAMPLING			300
+#define MAX_LEVEL							6
 
 #define ALPHA								1.0
 #define BETA								1.0
 
 #define PARAM_EXPLORATION					0.3 //1
+#define PARAM_EXPLORATION_VARIANCE			0.1//10
 
 //#define DEBUG		1
 
@@ -181,7 +182,9 @@ Node* Node::UCTSelectChild() {
 		if (children[i]->visits == 0) {
 			uct = 10000 + ml::genRand(0, 1000);
 		} else {
-			uct = children[i]->best_score + PARAM_EXPLORATION * sqrt(2 * log((double)visits) / (double)children[i]->visits);
+			uct = children[i]->best_score
+				+ PARAM_EXPLORATION * sqrt(2 * log((double)visits) / (double)children[i]->visits)
+				+ PARAM_EXPLORATION_VARIANCE * sqrt(ml::variance(children[i]->scores) + 0.0 / (double)children[i]->visits);
 		}
 
 		if (uct > max_uct) {
@@ -457,6 +460,27 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 			}
 		}
 	}
+
+
+
+	////// デバッグ //////
+	/*
+	for (int i = 0; i < current_node->children.size(); ++i) {
+		cout << "  " << i << ":" << endl;
+		if (current_node->children[i]->action.type == Action::ACTION_RULE) {
+			cout << current_node->children[i]->action.rule << endl;
+		} else {
+			cout << current_node->children[i]->action.value << endl;
+		}
+		cout << "    - visits: " << current_node->children[i]->visits << endl;
+		cout << "    - best score: " << current_node->children[i]->best_score << endl;
+		cout << "    - avg score: " << ml::mean(current_node->children[i]->scores) << endl;
+		cout << "    - var score: " << ml::variance(current_node->children[i]->scores) << endl;
+	}
+	*/
+	////// デバッグ //////
+
+
 
 	// ベストスコアの子ノードを返却する
 	return current_node->bestChild();;
