@@ -7,14 +7,14 @@
 #include <list>
 
 #define MAX_ITERATIONS						50
-#define MAX_ITERATIONS_FOR_MC				10
+#define MAX_ITERATIONS_FOR_MC				50
 #define NUM_MONTE_CARLO_SAMPLING			200
 #define MAX_LEVEL							5
 
 #define ALPHA								1.0
 #define BETA								1.0
 
-#define PARAM_EXPLORATION					0.3//1 //1
+#define PARAM_EXPLORATION					0.3 //1
 
 //#define DEBUG		1
 
@@ -331,21 +331,30 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 	Node* root = new Node(model);
 	root->setActions(getActions(model));
 
-	Node* node = root;
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
 		// もしノードがリーフノードなら、終了
-		if (node->untriedActions.size() == 0 && node->children.size() == 0) break;
+		if (root->untriedActions.size() == 0 && root->children.size() == 0) break;
 
-		node = UCT(node, target, count);
+		Node* best_child = UCT(root, target, count);
 
-		cout << l << ": " << node->best_score << endl;
+		// ベストスコアの子ノード以外のメモリを解放する
+		for (int i = 0; i < root->children.size(); ++i) {
+			if (root->children[i] == best_child) continue;
+			releaseNodeMemory(root->children[i]);
+		}
+
+		// ベストの子ノードをルートノードにする
+		root = best_child;
+		root->parent = NULL;
+
+		cout << l << ": " << root->best_score << endl;
 	}
 
-	// ベストスコアの子孫を辿ってリーフノードまで行く
+	// ベストスコアの子孫を辿ってリーフノードまで行き、モデルを取得する
+	Node* node = root;
 	while (node->children.size() > 0) {
 		node = node->bestChild();
 	}
-
 	model = node->model;
 
 	// ノードのメモリを解法
@@ -450,7 +459,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 	}
 
 	// ベストスコアの子ノードを返却する
-	return current_node->bestChild();
+	return current_node->bestChild();;
 }
 
 /**
@@ -487,7 +496,6 @@ double ParametricLSystem::distance(const cv::Mat& indicator, const cv::Mat& targ
  * @return				距離
  */
 double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target, int white_count) {
-	//return 1.0 - ml::mat_squared_sum(indicator - target) / (double)indicator.rows / (double)indicator.cols;
 	return 1.0 - ml::mat_squared_sum(indicator - target) / white_count;
 }
 
@@ -562,9 +570,10 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
 
 void ParametricLSystem::releaseNodeMemory(Node* node) {
 	for (int i = 0; i < node->children.size(); ++i) {
-		releaseNodeMemory(node->children[i]);
+		if (node->children[i] != NULL) releaseNodeMemory(node->children[i]);
 	}
 	delete node;
+	node = NULL;
 }
 
 float deg2rad(float deg) {
