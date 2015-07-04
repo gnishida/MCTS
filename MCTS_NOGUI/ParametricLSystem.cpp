@@ -135,6 +135,12 @@ Node* Node::addChild(const String& model, const Action& action) {
 	return child;
 }
 
+/**
+ * ノードに、actionを登録する。
+ * また、untriedActionsに、登録したactionのindex番号のリストをセットする
+ *
+ * @param actions	actionのリスト
+ */
 void Node::setActions(std::vector<Action>& actions) {
 	this->actions = actions;
 	for (int i = 0; i < actions.size(); ++i) {
@@ -196,6 +202,11 @@ Node* Node::UCTSelectChild() {
 	return best_child;
 }
 
+/**
+ * ベストスコアの子ノードを返却する。
+ *
+ * @return		ベストスコアの子ノード
+ */
 Node* Node::bestChild() {
 	double best_score = -std::numeric_limits<double>::max();
 	Node* best_child = NULL;
@@ -360,7 +371,7 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 	}
 	model = node->model;
 
-	// ノードのメモリを解法
+	// ノードのメモリを解放
 	releaseNodeMemory(root);
 
 	// スコア表示
@@ -468,9 +479,9 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 	for (int i = 0; i < current_node->children.size(); ++i) {
 		cout << "  " << i << ":" << endl;
 		if (current_node->children[i]->action.type == Action::ACTION_RULE) {
-			cout << current_node->children[i]->action.rule << endl;
+			cout << "   " << current_node->children[i]->action.rule << endl;
 		} else {
-			cout << current_node->children[i]->action.value << endl;
+			cout << "   " << current_node->children[i]->action.value << endl;
 		}
 		cout << "    - visits: " << current_node->children[i]->visits << endl;
 		cout << "    - best score: " << current_node->children[i]->best_score << endl;
@@ -488,6 +499,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 /**
  * indicatorとターゲットとの距離を計算して返却する。
+ * ※もう使っていない！
  *
  * @param indicator		indicator
  * @param target		ターゲットindicator
@@ -523,6 +535,12 @@ double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target,
 	return 1.0 - ml::mat_squared_sum(indicator - target) / white_count;
 }
 
+/**
+ * 指定されたモデルの、次のderivationの候補を返却する。
+ *
+ * @param model		モデル
+ * @return			次のderivationの候補リスト
+ */
 std::vector<Action> ParametricLSystem::getActions(const String& model) {
 	std::vector<Action> actions;
 
@@ -592,6 +610,11 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
 	}
 }
 
+/**
+ * 指定されたノードをルートとする探索木のメモリを解放する
+ *
+ * @param node		ノード
+ */
 void ParametricLSystem::releaseNodeMemory(Node* node) {
 	for (int i = 0; i < node->children.size(); ++i) {
 		if (node->children[i] != NULL) releaseNodeMemory(node->children[i]);
