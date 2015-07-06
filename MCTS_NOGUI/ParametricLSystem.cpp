@@ -494,7 +494,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 
 	// ベストスコアの子ノードを返却する
-	return current_node->bestChild();;
+	return current_node->bestChild();
 }
 
 /**
