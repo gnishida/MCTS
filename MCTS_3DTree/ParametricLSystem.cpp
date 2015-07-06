@@ -5,11 +5,12 @@
 #include "MLUtils.h"
 #include "GLUtils.h"
 #include <list>
+#include <QGLWidget>
 
 #define MAX_ITERATIONS						100
-#define MAX_ITERATIONS_FOR_MC				20
+#define MAX_ITERATIONS_FOR_MC				50
 #define NUM_MONTE_CARLO_SAMPLING			300
-#define MAX_LEVEL							6
+#define MAX_LEVEL							4
 
 #define ALPHA								1.0
 #define BETA								1.0
@@ -227,7 +228,50 @@ ParametricLSystem::ParametricLSystem(int grid_size, float scale) {
 
 	axiom = "X";
 	rules['X'].push_back("F");
-	rules['X'].push_back("F[-X][+X]");
+	rules['X'].push_back("F[-X]\\X");
+	rules['X'].push_back("F[+X]\\X");
+}
+
+void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices) {
+	vertices.clear();
+
+	glm::mat4 modelMat;
+	std::list<glm::mat4> stack;
+
+	for (int i = 0; i < model.length(); ++i) {
+		if (model[i].c == '[') {
+			stack.push_back(modelMat);
+		} else if (model[i].c == ']') {
+			modelMat = stack.back();
+			stack.pop_back();
+		} else if (model[i].c == '+') {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_value), glm::vec3(0, 0, 1));
+		} else if (model[i].c == '-') {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_value), glm::vec3(0, 0, 1));
+		} else if (model[i].c == '\\') {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_value), glm::vec3(0, 1, 0));
+		} else if (model[i].c == '/') {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_value), glm::vec3(0, 1, 0));
+		} else if (model[i].c == 'F') {
+			if (model[i].param_defined) {
+				double length = model[i].param_value;
+				double radius = 10.0 / (model[i].level + 1);
+			
+				glm::vec4 p(0, 0, 0, 1);
+				p = modelMat * p;
+				if (p.x >= -grid_size * 0.5 && p.x < grid_size * 0.5 && p.y >= 0 && p.y < grid_size) { // hack: 領域の外は描画しない
+					// 線を描画する
+					std::vector<Vertex> new_vertices;
+					glutils::drawSphere(glm::vec3(0, 0, 0), 1, glm::vec3(1, 1, 1), modelMat, vertices);
+					glutils::drawCylinder(glm::vec3(0, 0, 0), length, radius, glm::vec3(1, 1, 1), glm::rotate(modelMat, deg2rad(-90), glm::vec3(1, 0, 0)), vertices);
+				}
+
+				modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
+			}
+		} else if (model[i].c == 'X') {
+		} else {
+		}
+	}
 }
 
 /**
@@ -297,6 +341,10 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, cv::M
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_value), glm::vec3(0, 0, 1));
 		} else if (model[i].c == '-') {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_value), glm::vec3(0, 0, 1));
+		} else if (model[i].c == '\\') {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_value), glm::vec3(0, 1, 0));
+		} else if (model[i].c == '/') {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_value), glm::vec3(0, 1, 0));
 		} else if (model[i].c == 'F') {
 			if (model[i].param_defined) {
 				double length = model[i].param_value * scale;
@@ -569,6 +617,11 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 		for (int k = 0; k < 5; ++k) {
 			//double val = k * 25.0 + 10.0;
 			double val = k * 12.5 + 10.0;
+			actions.push_back(Action(i, val));
+		}
+	} else if (model[i].c == '\\' || model[i].c == '/') {
+		for (int k = 0; k < 5; ++k) {
+			double val = k * 72;
 			actions.push_back(Action(i, val));
 		}
 	}
