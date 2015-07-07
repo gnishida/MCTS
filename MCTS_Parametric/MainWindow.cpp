@@ -26,6 +26,7 @@ void MainWindow::onSaveImage() {
 void MainWindow::onRandomGeneration() {
 	cv::Mat indicator;
 	glWidget->model = glWidget->lsystem.derive(time(NULL), indicator);
+	//glWidget->model = glWidget->lsystem.derive(1234, indicator);
 
 	cout << glWidget->model << endl;
 	ml::mat_save("indicator.png", indicator);

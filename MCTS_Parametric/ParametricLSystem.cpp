@@ -7,7 +7,7 @@
 #include <list>
 #include <QGLWidget>
 
-#define MAX_ITERATIONS						10000
+#define MAX_ITERATIONS						1000//10000
 #define MAX_ITERATIONS_FOR_MC				50
 #define NUM_MONTE_CARLO_SAMPLING			300
 
@@ -395,30 +395,37 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, cv::M
 			modelMat = stack.back();
 			stack.pop_back();
 		} else if (model[i].name == "+" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
 		} else if (model[i].name == "-" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
-		} else if (model[i].name == "\\" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 1, 0));
+		} else if (model[i].name == "#" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
+		} else if (model[i].name == "\\" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "/" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "$" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[2] * scale;
-			double radius1 = model[i].param_values[3] * scale;
-			double radius2 = model[i].param_values[4] * scale;
-			
+			double radius = (model[i].param_values[3] + model[i].param_values[4]) * 0.5 * scale;
+
 			// 線を描画する代わりに、indicatorを更新する
 			glm::vec4 p1(0, 0, 0, 1);
 			glm::vec4 p2(0, 0, length, 1);
 			p1 = modelMat * p1;
 			p2 = modelMat * p2;
 			int u1 = p1.x + size * 0.5;
-			int v1 = p1.y;
+			int v1 = p1.z;
 			int u2 = p2.x + size * 0.5;
-			int v2 = p2.y;
+			int v2 = p2.z;
 
-			int thickness = max(1.0, 3.0 * scale);
-			cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
+			if (radius * scale > 0.2) {
+				int thickness = max(1.0, radius * scale);
+				cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
+			}
 
-			modelMat = glm::translate(modelMat, glm::vec3(0, length, 0));
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "X") {
 		} else {
 		}
