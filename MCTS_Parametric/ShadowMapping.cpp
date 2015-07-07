@@ -106,8 +106,8 @@ void ShadowMapping::makeShadowMap(GLWidget3D* glWidget3D, const glm::vec3& light
  * @param light_dir		光の進行方向
  */
 void ShadowMapping::updateShadowMatrix(const glm::vec3& light_dir) {
-	glm::mat4 light_pMatrix = glm::ortho<float>(-100, 100, -100, 100, 0.1, 5000);
-	glm::mat4 light_mvMatrix = glm::lookAt(-light_dir * 100.0f, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	glm::mat4 light_pMatrix = glm::ortho<float>(-50, 50, -50, 50, 0.1, 5000);
+	glm::mat4 light_mvMatrix = glm::lookAt(-light_dir * 50.0f, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	glm::mat4 light_mvpMatrix = light_pMatrix * light_mvMatrix;
 
 	// シェーダにmodel view projection行列を渡す

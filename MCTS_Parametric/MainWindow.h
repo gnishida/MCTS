@@ -16,6 +16,7 @@ public:
 	MainWindow(QWidget *parent = 0, Qt::WFlags flags = 0);
 
 public slots:
+	void onSaveImage();
 	void onRandomGeneration();
 	void onGreedyInverse();
 

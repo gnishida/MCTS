@@ -1,10 +1,13 @@
 ﻿#include "MainWindow.h"
 #include "MLUtils.h"
 #include <time.h>
+#include <QDir>
+#include <QDate>
 
 MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, flags) {
 	ui.setupUi(this);
 
+	connect(ui.actionSaveImage, SIGNAL(triggered()), this, SLOT(onSaveImage()));
 	connect(ui.actionExit, SIGNAL(triggered()), this, SLOT(close()));
 	connect(ui.actionRandomGeneration, SIGNAL(triggered()), this, SLOT(onRandomGeneration()));
 	connect(ui.actionGreedyInverse, SIGNAL(triggered()), this, SLOT(onGreedyInverse()));
@@ -13,9 +16,16 @@ MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, 
 	setCentralWidget(glWidget);
 }
 
+void MainWindow::onSaveImage() {
+	if (!QDir("screenshots").exists()) QDir().mkdir("screenshots");
+	QString fileName = "screenshots/" + QDate::currentDate().toString("yyMMdd") + "_" + QTime::currentTime().toString("HHmmss") + ".png";
+	glWidget->grabFrameBuffer().save(fileName);
+	printf("Save %s\n",fileName.toAscii().constData());
+}
+
 void MainWindow::onRandomGeneration() {
 	cv::Mat indicator;
-	glWidget->model = glWidget->lsystem.derive(3, indicator);
+	glWidget->model = glWidget->lsystem.derive(time(NULL), indicator);
 
 	cout << glWidget->model << endl;
 	ml::mat_save("indicator.png", indicator);

@@ -39,6 +39,7 @@ public:
 	Literal(const string& name, int depth, double param_value1, double param_value2);
 	Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3);
 	Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4);
+	Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4, double param_value5);
 	Literal(const string& name, int depth, const std::vector<double>& param_values);
 	
 	String operator+(const Literal& l) const;
