@@ -75,13 +75,14 @@ public:
 public:
 	int type;		// 0 -- rule / 1 -- value
 	int index;		// モデルの何文字目の変数に対するactionか？
+	int action_index;	// actionsの中の何番目のactionか？
 	String rule;
 	double value;
 
 public:
 	Action() {}
-	Action(int index, const String& rule);
-	Action(int index, double value);
+	Action(int action_index, int index, const String& rule);
+	Action(int action_index, int index, double value);
 
 	String apply(const String& model);
 };
@@ -110,6 +111,7 @@ public:
 	void setActions(std::vector<Action>& actions);
 	Action randomlySelectAction();
 	void removeAction(int index);
+	Node* getChild(int index);
 	Node* UCTSelectChild();
 	Node* bestChild();
 };
@@ -120,6 +122,7 @@ public:
 	int grid_size;
 	int indicator_data_type;
 	float scale;
+	int num_nodes;
 
 	String axiom;
 	map<char, vector<string> > rules;

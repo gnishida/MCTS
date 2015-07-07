@@ -7,9 +7,9 @@
 #include <list>
 #include <QGLWidget>
 
-#define MAX_ITERATIONS						1000//10000
+#define MAX_ITERATIONS						50//10000
 #define MAX_ITERATIONS_FOR_MC				50
-#define NUM_MONTE_CARLO_SAMPLING			300
+#define NUM_MONTE_CARLO_SAMPLING			1000
 
 #define ALPHA								1.0
 #define BETA								1.0
@@ -134,14 +134,16 @@ ostream& operator<<(ostream& os, const String& str) {
     return os;
 }
 
-Action::Action(int index, const String& rule) {
+Action::Action(int action_index, int index, const String& rule) {
 	this->type = ACTION_RULE;
+	this->action_index = action_index;
 	this->index = index;
 	this->rule = rule;
 }
 
-Action::Action(int index, double value) {
+Action::Action(int action_index, int index, double value) {
 	this->type = ACTION_VALUE;
+	this->action_index = action_index;
 	this->index = index;
 	this->value = value;
 }
@@ -225,6 +227,16 @@ void Node::removeAction(int index) {
 			return;
 		}
 	}
+}
+
+/**
+ * childrenの中で、指定されたindex値を持つ子ノードを返却する。
+ */
+Node* Node::getChild(int index) {
+	for (int i = 0; i < children.size(); ++i) {
+		if (children[i]->action.action_index == index) return children[i];
+	}
+	return NULL;
 }
 
 /**
@@ -357,7 +369,6 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
 	String model = start_model;
 
 	for (int iter = 0; iter < max_iterations; ++iter) {
-		cout << iter << endl;
 		std::vector<Action> actions = getActions(model);
 		if (actions.size() == 0) break;
 
@@ -454,6 +465,7 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 	String model = axiom;
 	Node* root = new Node(model);
 	root->setActions(getActions(model));
+	num_nodes = 1;
 
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
 		// もしノードがリーフノードなら、終了
@@ -471,7 +483,7 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 		root = best_child;
 		root->parent = NULL;
 
-		cout << l << ": " << root->best_score << endl;
+		cout << l << ": " << "Best score=" << root->best_score << ", #nodes=" << num_nodes << endl;
 	}
 
 	// ベストスコアの子孫を辿ってリーフノードまで行き、モデルを取得する
@@ -512,12 +524,13 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 		}
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
-		if (node->untriedActions.size() > 0) {
+		if (node->untriedActions.size() > 0 && node->children.size() < sqrt(2.0 * log(iter + 1.0))) {
 			Action action = node->randomlySelectAction();
 			String child_model = action.apply(node->model);
 
 			node = node->addChild(child_model, action);
 			node->setActions(getActions(child_model));
+			num_nodes++;
 		}
 
 		// ランダムにderiveする
@@ -564,15 +577,21 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 		if (updated) {
 			Node* node = leaf;
 			for (int di = 0; di < derivation_history.size(); ++di) {
-				node->removeAction(derivation_history[di]);
+				Node* c = node->getChild(derivation_history[di]);
+				if (c == NULL) {
+					node->removeAction(derivation_history[di]);
+					String child_model = node->actions[derivation_history[di]].apply(node->model);
 
-				String child_model = node->actions[derivation_history[di]].apply(node->model);
+					c = node->addChild(child_model, node->actions[derivation_history[di]]);
+					c->setActions(getActions(child_model));
+					num_nodes++;
+				}
 
-				node = node->addChild(child_model, node->actions[derivation_history[di]]);
-				node->setActions(getActions(child_model));
-				node->visits = 1;
-				node->best_score = sc;
-				node->scores.push_back(sc);
+				c->visits++;
+				c->best_score = sc;
+				c->scores.push_back(sc);
+
+				node = c;
 				
 				// リーフノードなら、スコアを確定する
 				if (node->untriedActions.size() == 0 && node->children.size() == 0) {
@@ -669,17 +688,19 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 						model[i].param_values[2], 
 						model[i].param_values[3],
 						0);
-			actions.push_back(Action(i, rule));
+			actions.push_back(Action(0, i, rule));
 		} else {
-			for (float k = 0.2f; k <= 0.8f; k += 0.1f) {
+			int count = 0;
+			for (float k = 0.2f; k <= 0.8f; k += 0.2f, ++count) {
 				String rule = String() 
 					+ Literal("C", model[i].depth + 1, model[i].param_values[2], 0, model[i].param_values[2] * k, model[i].param_values[3], model[i].param_values[3] * (1.0 - k))
 					+ Literal("T", model[i].depth + 1, model[i].param_values[2], k, model[i].param_values[2] * (1-k), model[i].param_values[3] * (1.0 - k), model[i].param_values[4]);
-				actions.push_back(Action(i, rule));
+				actions.push_back(Action(count, i, rule));
 			}
 		}
 	} else if (model[i].name == "T") {
-		for (int k = 2; k <= 10; ++k) {
+		int count = 0;
+		for (int k = 2; k <= 10; k += 2, ++count) {
 			String rule;
 			for (int l = 0; l < k; ++l) {
 				rule += Literal("S", model[i].depth + 1, 
@@ -690,17 +711,18 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 					(model[i].param_values[3] - model[i].param_values[4]) / (float)k * (k - l - 1) + model[i].param_values[4])
 					+ Literal("\\", model[i].depth + 1);
 			}
-			actions.push_back(Action(i, rule));
+			actions.push_back(Action(count, i, rule));
 		}
 	} else if (model[i].name == "S") {
-		for (float k = 0.3f; k <= 0.8f; k += 0.1f) {
+		int count = 0;
+		for (float k = 0.3f; k <= 0.7f; k += 0.2f, ++count) {
 			String rule = String()
 				+ Literal("[", model[i].depth + 1)
 				+ Literal("+", model[i].depth + 1)
 				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * (1.0 - model[i].param_values[1]) * k, 0, model[i].param_values[0] * (1.0 - model[i].param_values[1]) * k, model[i].param_values[3] * k, 0)//model[i].param_values[3] * k)
 				+ Literal("]", model[i].depth + 1)
 				+ Literal("C", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1], model[i].param_values[2], model[i].param_values[3], model[i].param_values[4]);
-			actions.push_back(Action(i, rule));
+			actions.push_back(Action(count, i, rule));
 		}
 	} else if (model[i].name == "C") {
 		int n = ceil(model[i].param_values[2] / 1.0);
@@ -715,19 +737,21 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 				+ Literal("#", model[i].depth + 1);
 				//+ Literal("$", model[i].depth + 1);
 		}
-		actions.push_back(Action(i, rule));
+		actions.push_back(Action(0, i, rule));
 	} else if (model[i].name == "-" || model[i].name == "+") {
-		for (float k = 20.0f; k <= 80.0f; k += 10.0f) {
-			actions.push_back(Action(i, k));
+		int count = 0;
+		for (float k = 20.0f; k <= 80.0f; k += 20.0f, ++count) {
+			actions.push_back(Action(count, i, k));
 		}
 	} else if (model[i].name == "\\") {
-		//actions.push_back(Action(i, 180));		
-		for (float k = 10; k < 180; k += 10) {
-			actions.push_back(Action(i, k));
+		int count = 0;
+		for (float k = 10; k < 180; k += 40, ++count) {
+			actions.push_back(Action(count, i, k));
 		}
 	} else if (model[i].name == "#" || model[i].name == "$") {
-		for (int k = -5; k <= 5; k += 5) {
-			actions.push_back(Action(i, k));
+		int count = 0;
+		for (int k = -5; k <= 5; k += 5, ++count) {
+			actions.push_back(Action(count, i, k));
 		}
 	}
 
@@ -775,7 +799,10 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
  */
 void ParametricLSystem::releaseNodeMemory(Node* node) {
 	for (int i = 0; i < node->children.size(); ++i) {
-		if (node->children[i] != NULL) releaseNodeMemory(node->children[i]);
+		if (node->children[i] != NULL) {
+			releaseNodeMemory(node->children[i]);
+			num_nodes--;
+		}
 	}
 	delete node;
 	node = NULL;
