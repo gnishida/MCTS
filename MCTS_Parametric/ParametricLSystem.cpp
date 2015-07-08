@@ -7,9 +7,9 @@
 #include <list>
 #include <QGLWidget>
 
-#define MAX_ITERATIONS						30
-#define MAX_ITERATIONS_FOR_MC				50
-#define NUM_MONTE_CARLO_SAMPLING			500
+#define MAX_ITERATIONS						60
+#define MAX_ITERATIONS_FOR_MC				30
+#define NUM_MONTE_CARLO_SAMPLING			800
 
 #define ALPHA								1.0
 #define BETA								1.0
@@ -522,7 +522,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 		}
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
-		if (node->untriedActions.size() > 0 && node->children.size() < sqrt(2.0 * log(iter + 1.0))) {
+		if (node->untriedActions.size() > 0) {// && node->children.size() <= ml::log((double)iter * 0.01 + 1, 1.4)) {
 			Action action = node->randomlySelectAction();
 			String child_model = action.apply(node->model);
 
@@ -575,14 +575,16 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 		if (updated) {
 
 			/////// デバッグ ///////
+			/*
 			char filename[256];
 			sprintf(filename, "indicator_%lf.png", sc);
 			ml::mat_save(filename, indicator);
+			*/
 			/////// デバッグ ///////
 
 
 			Node* node = leaf;
-			for (int di = 0; di < derivation_history.size(); ++di) {
+			for (int di = 0; di < min((int)derivation_history.size(), 10); ++di) {
 				Node* c = node->getChild(derivation_history[di]);
 				if (c == NULL) {
 					node->removeAction(derivation_history[di]);
@@ -715,17 +717,15 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 		}
 	} else if (model[i].name == "#") {
 		int count = 0;
-		for (int k = -5; k <= 5; k += 10, ++count) {
+		for (int k = -20; k <= 20; k += 10, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
 	} else if (model[i].name == "\\") {
 		int count = 0;
-		actions.push_back(Action(count, i, 180));
-		/*
+		//actions.push_back(Action(count, i, 180));
 		for (float k = 90; k < 150; k += 30, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
-		*/
 	}
 
 	return actions;

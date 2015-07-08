@@ -56,12 +56,10 @@ void MainWindow::onGreedyInverse() {
 
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
-	glWidget->lsystem.computeIndicator(glWidget->model, 1.0f, img);
-	/*
-	cv::resize(target, target, cv::Size(300, 300));
+	glWidget->lsystem.computeIndicator(glWidget->model, 1.5f, img);
+	cv::resize(target, target, cv::Size(30, 30));
 	target.convertTo(target, CV_32F, 0.4);
 	img += target;
-	*/
 	ml::mat_save("result.png", img);
 
 	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
