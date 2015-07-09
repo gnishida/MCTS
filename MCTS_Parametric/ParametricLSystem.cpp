@@ -7,8 +7,8 @@
 #include <list>
 #include <QGLWidget>
 
-#define MAX_ITERATIONS						60
-#define MAX_ITERATIONS_FOR_MC				30
+#define MAX_ITERATIONS						200
+#define MAX_ITERATIONS_FOR_MC				15
 #define NUM_MONTE_CARLO_SAMPLING			800
 
 #define ALPHA								1.0
@@ -27,6 +27,7 @@ Literal::Literal(const string& name, int depth) {
 	this->name = name;
 	this->depth = depth;
 	this->param_defined = false;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value) {
@@ -34,6 +35,7 @@ Literal::Literal(const string& name, int depth, double param_value) {
 	this->depth = depth;
 	this->param_values.push_back(param_value);
 	this->param_defined = true;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2) {
@@ -42,6 +44,7 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value1);
 	this->param_values.push_back(param_value2);
 	this->param_defined = true;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3) {
@@ -51,6 +54,7 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value2);
 	this->param_values.push_back(param_value3);
 	this->param_defined = true;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4) {
@@ -61,6 +65,7 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value3);
 	this->param_values.push_back(param_value4);
 	this->param_defined = true;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4, double param_value5) {
@@ -72,6 +77,7 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value4);
 	this->param_values.push_back(param_value5);
 	this->param_defined = true;
+	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, const std::vector<double>& param_values) {
@@ -79,6 +85,7 @@ Literal::Literal(const string& name, int depth, const std::vector<double>& param
 	this->depth = depth;
 	this->param_values = param_values;
 	this->param_defined = true;
+	this->expand = false;
 }
 
 String Literal::operator+(const Literal& l) const {
@@ -111,8 +118,45 @@ String String::operator+(const String& str) const {
 }
 
 void String::replace(int index, const String& str) {
+	bool expand = this->str[index].expand;
+
 	this->str.erase(this->str.begin() + index);
 	this->str.insert(this->str.begin() + index, str.str.begin(), str.str.end());
+
+	for (int i = index; i < index + str.length(); ++i) {
+		this->str[i].expand = expand;
+	}
+}
+
+/**
+ * index番目の変数以降で、同じレベルの変数をexpandマークつける
+ *
+ * @param index		index
+ */
+void String::setExpand(int index) {
+	int nest = 0;
+	for (int i = index; i < str.size(); ++i) {
+		if (str[i].name == "[") {
+			nest++;
+		} else if (str[i].name == "]") {
+			nest--;
+		} else {
+			if (nest == 0) {
+				str[i].expand = true;
+			}
+		}
+
+		if (nest < 0) break;
+	}
+}
+
+/**
+ * expandマークをすべてクリアする
+ */
+void String::resetExpand() {
+	for (int i = 0; i < str.size(); ++i) {
+		str[i].expand = false;
+	}
 }
 
 ostream& operator<<(ostream& os, const String& str) {
@@ -323,7 +367,7 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0];
 			double radius1 = model[i].param_values[1];
-			double radius2 = radius1 - length / 20.0f;
+			double radius2 = radius1 - length / 30.0f;
 			
 			glm::vec4 p(0, 0, 0, 1);
 			p = modelMat * p;
@@ -350,24 +394,24 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
 	std::vector<int> derivation_history;
 
 	ml::initRand(random_seed);
-	return derive(axiom, MAX_ITERATIONS, indicator, derivation_history);
+	return derive(axiom, MAX_ITERATIONS, false, indicator, derivation_history);
 }
 
 /**
  * 指定された開始モデルからスタートし、ランダムにgenerateする。
  *
- * @param start_model		開始モデル
- * @param random_seed		乱数シード
- * @param max_iterations	繰り返し数
- * @param build_tree		木を生成するか？
- * @param indicator [OUT]	生成されたモデルのindicator
- * @return					生成されたモデル
+ * @param start_model			開始モデル
+ * @param max_iterations		繰り返し数
+ * @param onlyExpandableLiteral trueなら、expandマークがついた変数のみ、expandする
+ * @param build_tree			木を生成するか？
+ * @param indicator [OUT]		生成されたモデルのindicator
+ * @return						生成されたモデル
  */
-String ParametricLSystem::derive(const String& start_model, int max_iterations, cv::Mat& indicator, std::vector<int>& derivation_history) {
+String ParametricLSystem::derive(const String& start_model, int max_iterations, bool onlyExpandableLiteral, cv::Mat& indicator, std::vector<int>& derivation_history) {
 	String model = start_model;
 
 	for (int iter = 0; iter < max_iterations; ++iter) {
-		std::vector<Action> actions = getActions(model);
+		std::vector<Action> actions = getActions(model, onlyExpandableLiteral);
 		if (actions.size() == 0) break;
 
 		int index = ml::genRand(0, actions.size());
@@ -416,7 +460,7 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, cv::M
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			double radius1 = model[i].param_values[1] * scale;
-			double radius2 = radius1 - length / 20.0f;
+			double radius2 = radius1 - length / 30.0f;
 			double radius = (radius1 + radius2) * 0.5f;
 
 			// 線を描画する代わりに、indicatorを更新する
@@ -461,38 +505,25 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 
 	// UCTを使って探索木を構築していく
 	String model = axiom;
-	Node* root = new Node(model);
-	root->setActions(getActions(model));
-	num_nodes = 1;
 
 	for (int l = 0; l < MAX_ITERATIONS; ++l) {
-		// もしノードがリーフノードなら、終了
-		if (root->untriedActions.size() == 0 && root->children.size() == 0) break;
+		model = UCT(model, target, count);
 
-		Node* best_child = UCT(root, target, count);
+		cv::Mat indicator;
+		computeIndicator(model, scale, indicator);
+		double sc = score(indicator, target, count);
 
-		// ベストスコアの子ノード以外のメモリを解放する
-		for (int i = 0; i < root->children.size(); ++i) {
-			if (root->children[i] == best_child) continue;
-			releaseNodeMemory(root->children[i]);
-		}
-
-		// ベストの子ノードをルートノードにする
-		root = best_child;
-		root->parent = NULL;
-
-		cout << l << ": " << "Best score=" << root->best_score << ", #nodes=" << num_nodes << endl;
+		cout << l << ": " << "Best score=" << sc << endl;
 	}
 
 	// ベストスコアの子孫を辿ってリーフノードまで行き、モデルを取得する
+	/*
 	Node* node = root;
 	while (node->children.size() > 0) {
 		node = node->bestChild();
 	}
 	model = node->model;
-
-	// ノードのメモリを解放
-	releaseNodeMemory(root);
+	*/
 
 	// スコア表示
 	cv::Mat indicator;
@@ -509,8 +540,25 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
  * @param target	ターゲット
  * @return			最善のoption
  */
-Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int white_count) {
+String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target, int white_count) {
+	// これ以上、derivationできなら、終了
+	int index = findNextLiteralToDefineValue(current_model);
+	if (index < 0) return current_model;
+
+	// expandする変数をマークをつける
+	String model = current_model;
+	model.setExpand(index);
+
+
+	Node* current_node = new Node(model);
+	current_node->setActions(getActions(model, true));
+
+
+
 	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
+		// もしノードがリーフノードなら、終了
+		if (current_node->untriedActions.size() == 0 && current_node->children.size() == 0) break;
+
 		// 現在のノードのスコアが確定したら、終了
 		if (current_node->fixed) break;
 
@@ -527,14 +575,14 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 			String child_model = action.apply(node->model);
 
 			node = node->addChild(child_model, action);
-			node->setActions(getActions(child_model));
+			node->setActions(getActions(child_model, true));
 			num_nodes++;
 		}
 
 		// ランダムにderiveする
 		cv::Mat indicator;
 		std::vector<int> derivation_history;
-		derive(node->model, MAX_ITERATIONS_FOR_MC, indicator, derivation_history);
+		derive(node->model, MAX_ITERATIONS_FOR_MC, true, indicator, derivation_history);
 
 		// スコアを計算する
 		double sc = score(indicator, target, white_count);
@@ -591,7 +639,7 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 					String child_model = node->actions[derivation_history[di]].apply(node->model);
 
 					c = node->addChild(child_model, node->actions[derivation_history[di]]);
-					c->setActions(getActions(child_model));
+					c->setActions(getActions(child_model, true));
 					num_nodes++;
 				}
 
@@ -630,8 +678,13 @@ Node* ParametricLSystem::UCT(Node* current_node, const cv::Mat& target, int whit
 
 
 
-	// ベストスコアの子ノードを返却する
-	return current_node->bestChild();
+	String best_model = current_node->bestChild()->model;
+	best_model.resetExpand();
+
+	// 探索木のメモリを解放する
+	releaseNodeMemory(current_node);
+	
+	return best_model;
 }
 
 /**
@@ -679,35 +732,36 @@ double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target,
  * @param model		モデル
  * @return			次のderivationの候補リスト
  */
-std::vector<Action> ParametricLSystem::getActions(const String& model) {
+std::vector<Action> ParametricLSystem::getActions(const String& model, bool onlyExpandableLiteral) {
 	std::vector<Action> actions;
 
 	// 展開するパラメータを決定
-	int i = findNextLiteralToDefineValue(model);
+	int i = findNextLiteralToDefineValue(model, onlyExpandableLiteral);
 
 	// 新たなderivationがないなら、終了
 	if (i == -1) return actions;
 
 	if (model[i].name == "X") {
-		/*String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1]);
-		actions.push_back(Action(0, i, rule));*/
+		//String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1]);
+		String rule = Literal("F", model[i].depth + 1, 0, 0);
+		actions.push_back(Action(0, i, rule));
 
-		if (model[i].param_values[0] >= 0.1f) {
+		if (model[i].param_values[0] >= 0.05f) {
 			String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1])
 				+ Literal("\\", model[i].depth + 1)
 				+ Literal("#", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.7f, model[i].param_values[1] - model[i].param_values[0] / 20.0f);
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] - model[i].param_values[0] / 30.0f);
 			actions.push_back(Action(1, i, rule));
 
 			rule = Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1])
 				+ Literal("[", model[i].depth + 1)
 				+ Literal("+", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.7f, model[i].param_values[1] * 0.7f)
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] * 0.8f)
 				+ Literal("]", model[i].depth + 1)
-				+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1] - model[i].param_values[0] / 40.0f)
+				+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1] - model[i].param_values[0] / 60.0f)
 				+ Literal("\\", model[i].depth + 1)
 				+ Literal("#", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.7f, model[i].param_values[1] - model[i].param_values[0] / 20.0f);
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] - model[i].param_values[0] / 30.0f);
 			actions.push_back(Action(2, i, rule));
 		}
 	} else if (model[i].name == "-" || model[i].name == "+") {
@@ -723,7 +777,7 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 	} else if (model[i].name == "\\") {
 		int count = 0;
 		//actions.push_back(Action(count, i, 180));
-		for (float k = 90; k < 150; k += 30, ++count) {
+		for (float k = 120; k <= 180; k += 30, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
 	}
@@ -735,22 +789,23 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
  * 現在のモデルについて、値が未設定のパラメータで最もレベルが低く、最も左側に位置するindexを返却する。
  * もし未設定のパラメータがない場合は、-1を返却する。
  *
- * @param str		現在のモデル
- * @return			インデックス
+ * @param str					現在のモデル
+ * @param onlyExpandableLiteral trueなら、expandマークがついた変数のみが対象
+ * @return						インデックス
  */
-int ParametricLSystem::findNextLiteralToDefineValue(const String& str) {
+int ParametricLSystem::findNextLiteralToDefineValue(const String& str, bool onlyExpandableLiteral) {
 	int min_depth1 = std::numeric_limits<int>::max();
 	int min_depth2 = std::numeric_limits<int>::max();
 	int min_index1 = -1;
 	int min_index2 = -1;
 
 	for (int i = 0; i < str.length(); ++i) {
-		if (str[i].name == "X") {
+		if (str[i].name == "X" && (!onlyExpandableLiteral || str[i].expand)) {
 			if (str[i].depth < min_depth1) {
 				min_depth1 = str[i].depth;
 				min_index1 = i;
 			}
-		} else if ((str[i].name == "+" || str[i].name == "-" || str[i].name == "\\" || str[i].name == "/" || str[i].name == "#") && !str[i].param_defined) {
+		} else if ((str[i].name == "+" || str[i].name == "-" || str[i].name == "\\" || str[i].name == "/" || str[i].name == "#") && !str[i].param_defined && (!onlyExpandableLiteral || str[i].expand)) {
 			if (str[i].depth < min_depth2) {
 				min_depth2 = str[i].depth;
 				min_index2 = i;

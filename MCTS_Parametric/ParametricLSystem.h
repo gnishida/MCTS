@@ -31,6 +31,7 @@ public:
 	int depth;
 	std::vector<double> param_values;
 	bool param_defined;
+	bool expand;
 
 public:
 	Literal() {}
@@ -61,6 +62,9 @@ public:
 	void operator+=(const String& str);
 	String operator+(const String& str) const;
 	void replace(int index, const String& str);
+
+	void setExpand(int index);
+	void resetExpand();
 };
 
 ostream& operator<<(ostream& os, const String& dt);
@@ -131,16 +135,16 @@ public:
 	ParametricLSystem(int grid_size, float scale);
 	void draw(const String& model, std::vector<Vertex>& vertices);
 	String derive(int random_seed, cv::Mat& indicator);
-	String derive(const String& start_model, int max_iterations, cv::Mat& indicator, std::vector<int>& derivation_history);
+	String derive(const String& start_model, int max_iterations, bool onlyExpandableLiteral, cv::Mat& indicator, std::vector<int>& derivation_history);
 	void computeIndicator(const String& model, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);
-	Node* UCT(Node* current_node, const cv::Mat& target, int white_count);
+	String UCT(const String& model, const cv::Mat& target, int white_count);
 	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);
 	double score(const cv::Mat& indicator, const cv::Mat& target, int white_count);
 
 private:
-	std::vector<Action> getActions(const String& model);
-	int findNextLiteralToDefineValue(const String& str);
+	std::vector<Action> getActions(const String& model, bool onlyExpandableLiteral = false);
+	int findNextLiteralToDefineValue(const String& str, bool onlyExpandableLiteral = false);
 	void releaseNodeMemory(Node* node);
 };
 

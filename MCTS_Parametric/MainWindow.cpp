@@ -3,6 +3,7 @@
 #include <time.h>
 #include <QDir>
 #include <QDate>
+#include <QFileDialog>
 
 MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, flags) {
 	ui.setupUi(this);
@@ -37,8 +38,11 @@ void MainWindow::onRandomGeneration() {
 }
 
 void MainWindow::onGreedyInverse() {
+	QString filename = QFileDialog::getOpenFileName(this, tr("Open target file..."), "", tr("Indicator Files (*.png)"));
+	if (filename.isEmpty()) return;
+
 	// ターゲットindicatorを読み込む
-	cv::Mat target = cv::imread("target_indicator2.png", 0);
+	cv::Mat target = cv::imread(filename.toUtf8().data(), 0);
 	target.convertTo(target, CV_32F, 1.0/255.0);
 	cv::flip(target, target, 0);
 
@@ -56,8 +60,8 @@ void MainWindow::onGreedyInverse() {
 
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
-	glWidget->lsystem.computeIndicator(glWidget->model, 1.5f, img);
-	cv::resize(target, target, cv::Size(30, 30));
+	glWidget->lsystem.computeIndicator(glWidget->model, 2.0f, img);
+	cv::resize(target, target, cv::Size(40, 40));
 	target.convertTo(target, CV_32F, 0.4);
 	img += target;
 	ml::mat_save("result.png", img);
