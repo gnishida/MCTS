@@ -3,7 +3,7 @@
 #include "OBJLoader.h"
 #include <iostream>
 
-GLWidget3D::GLWidget3D(MainWindow* mainWin) : QGLWidget(QGLFormat(QGL::SampleBuffers), (QWidget*)mainWin), lsystem(20, 2.0f) {
+GLWidget3D::GLWidget3D(MainWindow* mainWin) : QGLWidget(QGLFormat(QGL::SampleBuffers), (QWidget*)mainWin), lsystem(40, 1.0f) {
 	this->mainWin = mainWin;
 }
 

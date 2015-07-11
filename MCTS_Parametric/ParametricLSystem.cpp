@@ -7,9 +7,9 @@
 #include <list>
 #include <QGLWidget>
 
-#define MAX_ITERATIONS						200
-#define MAX_ITERATIONS_FOR_MC				15
-#define NUM_MONTE_CARLO_SAMPLING			800
+#define MAX_ITERATIONS						400//200
+#define MAX_ITERATIONS_FOR_MC				20//15
+#define NUM_MONTE_CARLO_SAMPLING			1600//800
 
 #define ALPHA								1.0
 #define BETA								1.0
@@ -20,6 +20,22 @@
 //#define DEBUG		1
 
 namespace parametriclsystem {
+
+
+FILE *fp1, *fp2, *fp3, *fp4, *fp5, *fp6, *fp7, *fp8, *fp9, *fp10, *fp11, *fp12, *fp13;
+double t1 = 0;
+double t2 = 0;
+double t3 = 0;
+double t4 = 0;
+double t5 = 0;
+double t6 = 0;
+double t7 = 0;
+double t8 = 0;
+double t9 = 0;
+double t10 = 0;
+double t11 = 0;
+double t12 = 0;
+double t13 = 0;
 
 const double M_PI = 3.141592653592;
 
@@ -335,7 +351,7 @@ ParametricLSystem::ParametricLSystem(int grid_size, float scale) {
 	this->grid_size = grid_size;
 	this->scale = scale;
 
-	axiom = String(Literal("X", 0, 6, 1));
+	axiom = String(Literal("X", 0, 6.0f, 1));
 	/*
 	rules['X'].push_back(Rule("X(l,r,s)", "F(l,r,s)"));
 	rules['X'].push_back(Rule("X(l,r,s)", "F(l/2,r,r/2+s/2)[-X(l/2,r/2+s/2,s)][+X(l/2,r/2+s/2,s)]X(l/2,r/2+s/2,s)"));
@@ -367,14 +383,14 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0];
 			double radius1 = model[i].param_values[1];
-			double radius2 = radius1 - length / 30.0f;
+			double radius2 = radius1 - length / 50.0f;
 			
 			glm::vec4 p(0, 0, 0, 1);
 			p = modelMat * p;
 			//if (p.x >= -grid_size * 0.5 && p.x < grid_size * 0.5 && p.y >= 0 && p.y < grid_size) { // hack: 領域の外は描画しない
 				// 線を描画する
 				std::vector<Vertex> new_vertices;
-				glutils::drawCone(glm::vec3(0, 0, 0), length, radius1, radius2, glm::vec3(ml::genRand(0, 1), 1, 1), modelMat, vertices);
+				glutils::drawCone(glm::vec3(0, 0, 0), length, radius1, radius2, glm::vec3(ml::genRand(0, 1), 1, ml::genRand(0, 1)), modelMat, vertices);
 			//}
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
@@ -415,12 +431,34 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
 		if (actions.size() == 0) break;
 
 		int index = ml::genRand(0, actions.size());
+		time_t start = clock();
 		derivation_history.push_back(index);
+		time_t end = clock();
+		t2 += end - start;
+		fprintf(fp2, "%lf\n", t2);
+		start = clock();
 		model = actions[index].apply(model);
+		end = clock();
+		t3 += end - start;
+		fprintf(fp3, "%lf\n", t3);
+		start = clock();
 	}
 
 	// indicatorを計算する
+	time_t start = clock();
 	computeIndicator(model, scale, indicator);
+	time_t end = clock();
+	t4 += end - start;
+	fprintf(fp4, "%lf\n", t4);
+
+
+
+	////// デバッグ //////
+	//ml::mat_save("indicator.png", indicator);
+	////// デバッグ //////
+
+
+
 
 	return model;
 }
@@ -460,7 +498,7 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, cv::M
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			double radius1 = model[i].param_values[1] * scale;
-			double radius2 = radius1 - length / 30.0f;
+			double radius2 = radius1 - length / 50.0f;
 			double radius = (radius1 + radius2) * 0.5f;
 
 			// 線を描画する代わりに、indicatorを更新する
@@ -493,6 +531,24 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, cv::M
  * @return					生成されたモデル
  */
 String ParametricLSystem::inverse(const cv::Mat& target) {
+	fp1 = fopen("time1.txt", "w");
+	fp2 = fopen("time2.txt", "w");
+	fp3 = fopen("time3.txt", "w");
+	fp4 = fopen("time4.txt", "w");
+	fp5 = fopen("time5.txt", "w");
+	fp6 = fopen("time6.txt", "w");
+	fp7 = fopen("time7.txt", "w");
+	fp8 = fopen("time8.txt", "w");
+	fp9 = fopen("time9.txt", "w");
+	fp10 = fopen("time10.txt", "w");
+	fp11 = fopen("time11.txt", "w");
+	fp12 = fopen("time12.txt", "w");
+	fp13 = fopen("time13.txt", "w");
+	
+
+
+
+
 	// 白色のピクセルの数をカウント
 	int count = 0;
 	for (int r = 0; r < target.rows; ++r) {
@@ -530,6 +586,23 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 	computeIndicator(model, scale, indicator);
 	cout << score(indicator, target, count) << endl;
 
+
+
+	fclose(fp1);
+	fclose(fp2);
+	fclose(fp3);
+	fclose(fp4);
+	fclose(fp5);
+	fclose(fp6);
+	fclose(fp7);
+	fclose(fp8);
+	fclose(fp9);
+	fclose(fp10);
+	fclose(fp11);
+	fclose(fp12);
+	fclose(fp13);
+
+
 	return model;
 }
 
@@ -542,12 +615,20 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
  */
 String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target, int white_count) {
 	// これ以上、derivationできなら、終了
+	time_t start = clock();
 	int index = findNextLiteralToDefineValue(current_model);
+	time_t end = clock();
+	t5 += end - start;
+	fprintf(fp5, "%lf\n", t5);
 	if (index < 0) return current_model;
 
 	// expandする変数をマークをつける
+	start = clock();
 	String model = current_model;
 	model.setExpand(index);
+	end = clock();
+	t6 += end - start;
+	fprintf(fp6, "%lf\n", t6);
 
 
 	Node* current_node = new Node(model);
@@ -565,11 +646,16 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		Node* node = current_node;
 
 		// 探索木のリーフノードを選択
+		start = clock();
 		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
 			node = node->UCTSelectChild();
 		}
+		end = clock();
+		t7 += end - start;
+		fprintf(fp7, "%lf\n", t7);
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
+		start = clock();
 		if (node->untriedActions.size() > 0) {// && node->children.size() <= ml::log((double)iter * 0.01 + 1, 1.4)) {
 			Action action = node->randomlySelectAction();
 			String child_model = action.apply(node->model);
@@ -578,11 +664,18 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 			node->setActions(getActions(child_model, true));
 			num_nodes++;
 		}
+		end = clock();
+		t8 += end - start;
+		fprintf(fp8, "%lf\n", t8);
 
 		// ランダムにderiveする
+		start = clock();
 		cv::Mat indicator;
 		std::vector<int> derivation_history;
 		derive(node->model, MAX_ITERATIONS_FOR_MC, true, indicator, derivation_history);
+		end = clock();
+		t12 += end - start;
+		fprintf(fp12, "%lf\n", t12);
 
 		// スコアを計算する
 		double sc = score(indicator, target, white_count);
@@ -594,6 +687,7 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		}
 
 		// スコアをbackpropagateする
+		start = clock();
 		bool updated = false;
 		Node* leaf = node;
 		while (node != NULL) {
@@ -618,8 +712,13 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 			node = node->parent;
 		}
+		end = clock();
+		t9 += end - start;
+		fprintf(fp9, "%lf\n", t9);
+
 
 		// ベストスコアを更新した場合は、このderivation上のノードを全て実体化する
+#if 0
 		if (updated) {
 
 			/////// デバッグ ///////
@@ -655,6 +754,7 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 				}
 			}
 		}
+#endif
 	}
 
 
@@ -677,12 +777,19 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	////// デバッグ //////
 
 
-
+	start = clock();
 	String best_model = current_node->bestChild()->model;
 	best_model.resetExpand();
+	end = clock();
+	t10 += end - start;
+	fprintf(fp10, "%lf\n", t10);
 
 	// 探索木のメモリを解放する
+	start = clock();
 	releaseNodeMemory(current_node);
+	end = clock();
+	t11 += end - start;
+	fprintf(fp11, "%lf\n", t11);
 	
 	return best_model;
 }
@@ -736,37 +843,63 @@ std::vector<Action> ParametricLSystem::getActions(const String& model, bool only
 	std::vector<Action> actions;
 
 	// 展開するパラメータを決定
+	time_t start = clock();
 	int i = findNextLiteralToDefineValue(model, onlyExpandableLiteral);
+	time_t end = clock();
+	t1 += end - start;
+	fprintf(fp1, "%lf\n", t1);
 
 	// 新たなderivationがないなら、終了
 	if (i == -1) return actions;
 
+	start = clock();
 	if (model[i].name == "X") {
 		//String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1]);
 		String rule = Literal("F", model[i].depth + 1, 0, 0);
 		actions.push_back(Action(0, i, rule));
 
-		if (model[i].param_values[0] >= 0.05f) {
+		if (model[i].param_values[0] >= 0.01f) {
 			String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1])
 				+ Literal("\\", model[i].depth + 1)
 				+ Literal("#", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] - model[i].param_values[0] / 30.0f);
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.9f, model[i].param_values[1] - model[i].param_values[0] / 50.0f);
 			actions.push_back(Action(1, i, rule));
 
 			rule = Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1])
 				+ Literal("[", model[i].depth + 1)
 				+ Literal("+", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] * 0.8f)
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.9f, model[i].param_values[1] * 0.9f)
 				+ Literal("]", model[i].depth + 1)
-				+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1] - model[i].param_values[0] / 60.0f)
+				+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1] - model[i].param_values[0] / 100.0f)
 				+ Literal("\\", model[i].depth + 1)
 				+ Literal("#", model[i].depth + 1)
-				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.8f, model[i].param_values[1] - model[i].param_values[0] / 30.0f);
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.9f, model[i].param_values[1] - model[i].param_values[0] / 50.0f);
 			actions.push_back(Action(2, i, rule));
 		}
+		
+		/*
+		if (model[i].param_values[0] >= 0.01f) {
+			String rule = Literal("T", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1])
+				+ Literal("\\", model[i].depth + 1)
+				+ Literal("#", model[i].depth + 1)
+				+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.9f, model[i].param_values[1] - model[i].param_values[0] / 50.0f);
+			actions.push_back(Action(1, i, rule));
+		}
+		*/
+	} else if (model[i].name == "T") {
+		String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1]);
+		actions.push_back(Action(1, i, rule));
+
+		rule = Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1])
+			+ Literal("[", model[i].depth + 1)
+			+ Literal("+", model[i].depth + 1)
+			+ Literal("X", model[i].depth + 1, model[i].param_values[0] * 0.9f, model[i].param_values[1] * 0.9f)
+			+ Literal("]", model[i].depth + 1)
+			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.5f, model[i].param_values[1] - model[i].param_values[0] / 100.0f);
+		actions.push_back(Action(2, i, rule));
 	} else if (model[i].name == "-" || model[i].name == "+") {
 		int count = 0;
-		for (float k = 40.0f; k <= 80.0f; k += 20.0f, ++count) {
+		for (int k = 20; k <= 80; k += 20, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
 	} else if (model[i].name == "#") {
@@ -777,10 +910,14 @@ std::vector<Action> ParametricLSystem::getActions(const String& model, bool only
 	} else if (model[i].name == "\\") {
 		int count = 0;
 		//actions.push_back(Action(count, i, 180));
-		for (float k = 120; k <= 180; k += 30, ++count) {
+		for (int k = 0; k <= 180; k += 30, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
 	}
+
+	end = clock();
+	t13 += end - start;
+	fprintf(fp13, "%lf\n", t13);
 
 	return actions;
 }
@@ -800,7 +937,7 @@ int ParametricLSystem::findNextLiteralToDefineValue(const String& str, bool only
 	int min_index2 = -1;
 
 	for (int i = 0; i < str.length(); ++i) {
-		if (str[i].name == "X" && (!onlyExpandableLiteral || str[i].expand)) {
+		if ((str[i].name == "X" || str[i].name == "T") && (!onlyExpandableLiteral || str[i].expand)) {
 			if (str[i].depth < min_depth1) {
 				min_depth1 = str[i].depth;
 				min_index1 = i;
