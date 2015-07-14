@@ -57,22 +57,23 @@ public:
 	//priority_queue<int, vector<int>, greater<int> > queue;
 
 public:
-	String() {}
+	String();
 	String(const string& str, int depth);
 	String(const Literal& l);
 
 	int length() const { return str.size(); }
 	Literal operator[](int index) const { return str[index]; }
 	Literal& operator[](int index) { return str[index]; }
-	void operator+=(const Literal& l) { str.push_back(l); }
+	void operator+=(const Literal& l);
 	void operator+=(const String& str);
 	String operator+(const String& str) const;
-	void setValue(double value, bool onlyExpandableLiteral);
-	void replace(const String& str, bool onlyExpandableLiteral);
+	void setValue(double value);
+	void replace(const String& str);
 
 	void setExpand();
 	void resetExpand();
-	void nextCursor(int depth, bool onlyExpandableLiteral);
+	String getExpand() const;
+	void nextCursor(int depth);
 };
 
 ostream& operator<<(ostream& os, const String& dt);
@@ -96,7 +97,7 @@ public:
 	Action(int action_index, int index, const String& rule);
 	Action(int action_index, int index, double value);
 
-	String apply(const String& model, bool onlyExpandableLiteral);
+	String apply(const String& model);
 };
 
 /**
@@ -142,8 +143,8 @@ public:
 public:
 	ParametricLSystem(int grid_size, float scale, const String& axiom);
 	String derive(int random_seed, cv::Mat& indicator);
-	String derive(const String& start_model, int max_iterations, bool onlyExpandableLiteral, cv::Mat& indicator, std::vector<int>& derivation_history);
-	void computeIndicator(const String& model, float scale, cv::Mat& indicator);
+	String derive(const String& start_model, int max_iterations, std::vector<int>& derivation_history);
+	void computeIndicator(const String& model, float scale, const glm::mat4& baseModelMat, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);
 	String UCT(const String& model, const cv::Mat& target, int derivation_step);
 	double score(const cv::Mat& indicator, const cv::Mat& target, const cv::Mat& mask);
@@ -152,6 +153,7 @@ private:
 	std::vector<Action> getActions(const String& model, bool onlyExpandableLiteral = false);
 	int findNextLiteralToDefineValue(const String& model, bool onlyExpandableLiteral = false);
 	glm::vec2 computeCurrentPoint(const String& model, float scale);
+	void computeCurrentMat(const String& model, float scale, glm::mat4& modelMmat);
 	void releaseNodeMemory(Node* node);
 };
 

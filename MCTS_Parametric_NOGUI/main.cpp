@@ -29,7 +29,7 @@ int main() {
 
 	// 生成したモデルの画像を保存する
 	cv::Mat img;
-	lsystem.computeIndicator(model, 4.0f, img);
+	lsystem.computeIndicator(model, 4.0f, glm::mat4(), img);
 	cv::resize(target, target, cv::Size(400, 400));
 	//target.convertTo(target, CV_32F, 0.4);
 	img += target * 0.4;

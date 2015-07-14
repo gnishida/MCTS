@@ -9,9 +9,9 @@
 #define SQR(x)	((x) * (x))
 
 
-#define MAX_ITERATIONS						1400//200
+#define MAX_ITERATIONS						100//1400//200
 #define MAX_ITERATIONS_FOR_MC				15
-#define NUM_MONTE_CARLO_SAMPLING			100//800
+#define NUM_MONTE_CARLO_SAMPLING			40//100
 
 #define PARAM_EXPLORATION					0.3 //1
 #define PARAM_EXPLORATION_VARIANCE			0.1//10
@@ -119,6 +119,10 @@ int Literal::type() {
 	}
 }
 
+String::String() {
+	this->cursor = -1;
+}
+
 String::String(const string& str, int depth) {
 	this->str.push_back(Literal(str, depth));
 	this->cursor = 0;
@@ -129,10 +133,18 @@ String::String(const Literal& l) {
 	this->cursor = 0;
 }
 
+void String::operator+=(const Literal& l) {
+	str.push_back(l);
+
+	if (cursor < 0) cursor = 0;
+}
+
 void String::operator+=(const String& str) {
 	for (int i = 0; i < str.length(); ++i) {
 		this->str.push_back(str[i]);
 	}
+
+	if (cursor < 0) cursor = 0;
 }
 
 String String::operator+(const String& str) const {
@@ -142,20 +154,22 @@ String String::operator+(const String& str) const {
 		new_str.str.push_back(str[i]);
 	}
 
+	if (new_str.cursor < 0 && new_str.length() > 0) new_str.cursor = 0;
+
 	return new_str;
 }
 
-void String::setValue(double value, bool onlyExpandableLiteral) {
+void String::setValue(double value) {
 	str[cursor].param_values.push_back(value);
 	str[cursor].param_defined = true;
 
 	cursor++;
 
 	// 次のリテラルを探す
-	nextCursor(str[cursor].depth, onlyExpandableLiteral);
+	nextCursor(str[cursor].depth);
 }
 
-void String::replace(const String& str, bool onlyExpandableLiteral) {
+void String::replace(const String& str) {
 	bool expand = this->str[cursor].expand;
 	int depth = this->str[cursor].depth;
 
@@ -168,7 +182,7 @@ void String::replace(const String& str, bool onlyExpandableLiteral) {
 	}
 
 	// 次のリテラルを探す
-	nextCursor(depth, onlyExpandableLiteral);
+	nextCursor(depth);
 }
 
 /**
@@ -200,14 +214,33 @@ void String::resetExpand() {
 	}
 }
 
-void String::nextCursor(int depth, bool onlyExpandableLiteral) {
+String String::getExpand() const {
+	String ret;
+
+	int nest = 0;
+	for (int i = cursor; i < str.size(); ++i) {
+		if (str[i].name == "[") {
+			nest++;
+		} else if (str[i].name == "]") {
+			nest--;
+		}
+
+		if (nest < 0) break;
+
+		ret += str[i];
+	}
+
+	return ret;
+}
+
+void String::nextCursor(int depth) {
 	for (int i = cursor; i < str.size(); ++i) {
 		if (str[i].depth != depth) continue;
 
-		if (str[i].type() == Literal::TYPE_NONTERMINAL && (!onlyExpandableLiteral || str[i].expand)) {
+		if (str[i].type() == Literal::TYPE_NONTERMINAL) {
 			cursor = i;
 			return;
-		} else if (str[i].type() == Literal::TYPE_TERMINAL && !str[i].param_defined && (!onlyExpandableLiteral || str[i].expand)) {
+		} else if (str[i].type() == Literal::TYPE_TERMINAL && !str[i].param_defined) {
 			cursor = i;
 			return;
 		}
@@ -219,10 +252,10 @@ void String::nextCursor(int depth, bool onlyExpandableLiteral) {
 	for (int i = 0; i < str.size(); ++i) {
 		if (str[i].depth != depth) continue;
 
-		if (str[i].type() == Literal::TYPE_NONTERMINAL && (!onlyExpandableLiteral || str[i].expand)) {
+		if (str[i].type() == Literal::TYPE_NONTERMINAL) {
 			cursor = i;
 			return;
-		} else if (str[i].type() == Literal::TYPE_TERMINAL && !str[i].param_defined && (!onlyExpandableLiteral || str[i].expand)) {
+		} else if (str[i].type() == Literal::TYPE_TERMINAL && !str[i].param_defined) {
 			cursor = i;
 			return;
 		}
@@ -259,16 +292,15 @@ Action::Action(int action_index, int index, double value) {
  * 指定されたモデルに、このアクションを適用する。
  *
  * @param model					モデル
- * @param onlyExpandableLiteral	action適用後、expandマークがついたリテラルの中からのみ次のリテラルを決定するか？
  * @return						action適用した後のモデル
  */
-String Action::apply(const String& model, bool onlyExpandableLiteral) {
+String Action::apply(const String& model) {
 	String new_model = model;
 
 	if (type == ACTION_RULE) {
-		new_model.replace(rule, onlyExpandableLiteral);
+		new_model.replace(rule);
 	} else {
-		new_model.setValue(value, onlyExpandableLiteral);
+		new_model.setValue(value);
 	}
 
 	return new_model;
@@ -413,7 +445,11 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
 	std::vector<int> derivation_history;
 
 	ml::initRand(random_seed);
-	return derive(axiom, MAX_ITERATIONS, false, indicator, derivation_history);
+	String result_model = derive(axiom, MAX_ITERATIONS, derivation_history);
+
+	computeIndicator(result_model, scale, glm::mat4(), indicator);
+
+	return result_model;
 }
 
 /**
@@ -426,11 +462,11 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
  * @param indicator [OUT]		生成されたモデルのindicator
  * @return						生成されたモデル
  */
-String ParametricLSystem::derive(const String& start_model, int max_iterations, bool onlyExpandableLiteral, cv::Mat& indicator, std::vector<int>& derivation_history) {
+String ParametricLSystem::derive(const String& start_model, int max_iterations, std::vector<int>& derivation_history) {
 	String model = start_model;
 
 	for (int iter = 0; iter < max_iterations; ++iter) {
-		std::vector<Action> actions = getActions(model, onlyExpandableLiteral);
+		std::vector<Action> actions = getActions(model);
 		if (actions.size() == 0) break;
 
 		int index = ml::genRand(0, actions.size());
@@ -440,28 +476,12 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
 		t2 += end - start;
 		fprintf(fp2, "%lf\n", t2);
 		start = clock();
-		model = actions[index].apply(model, onlyExpandableLiteral);
+		model = actions[index].apply(model);
 		end = clock();
 		t3 += end - start;
 		fprintf(fp3, "%lf\n", t3);
 		start = clock();
 	}
-
-	// indicatorを計算する
-	time_t start = clock();
-	computeIndicator(model, scale, indicator);
-	time_t end = clock();
-	t4 += end - start;
-	fprintf(fp4, "%lf\n", t4);
-
-
-
-	////// デバッグ //////
-	//ml::mat_save("indicator.png", indicator);
-	////// デバッグ //////
-
-
-
 
 	return model;
 }
@@ -473,21 +493,23 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
  * @param scale				grid_size * scaleのサイズでindicatorを計算する
  * @param indicator [OUT]	indicator
  */
-void ParametricLSystem::computeIndicator(const String& model, float scale, cv::Mat& indicator) {
+void ParametricLSystem::computeIndicator(const String& model, float scale, const glm::mat4& baseModelMat, cv::Mat& indicator) {
 	int size = grid_size * scale;
 
 	indicator = cv::Mat::zeros(size, size, CV_32F);
 
 	std::list<glm::mat4> stack;
 
-	glm::mat4 modelMat;
+	glm::mat4 modelMat = baseModelMat;
 
 	for (int i = 0; i < model.length(); ++i) {
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
 		} else if (model[i].name == "]") {
-			modelMat = stack.back();
-			stack.pop_back();
+			if (!stack.empty()) {
+				modelMat = stack.back();
+				stack.pop_back();
+			}
 		} else if (model[i].name == "+" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
 		} else if (model[i].name == "-" && model[i].param_defined) {
@@ -556,23 +578,19 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 		model = UCT(model, target, l);
 
 		cv::Mat indicator;
-		computeIndicator(model, scale, indicator);
+		computeIndicator(model, scale, glm::mat4(), indicator);
 		double sc = score(indicator, target, cv::Mat::ones(target.size(), CV_8U));
 
 		/////// デバッグ ///////
-		/*
 		char filename[256];
 		sprintf(filename, "indicator_%d.png", l);
-		computeIndicator(model, 10, indicator);
-		cv::Mat target2;
-		cv::resize(target, target2, cv::Size(400, 400));
+		computeIndicator(model, scale, glm::mat4(), indicator);
 
-		ml::mat_save(filename, indicator + target2 * 0.4);
-		*/
+		ml::mat_save(filename, indicator + target * 0.4);
 		/////// デバッグ ///////
 
-		//cout << l << ": " << "Best score=" << sc << " : " << model << endl;
-		cout << l << ": " << "Best score=" << sc << " : " << endl;
+		cout << l << ": " << "Best score=" << sc << " : " << model << endl;
+		//cout << l << ": " << "Best score=" << sc << " : " << endl;
 	}
 
 	// ベストスコアの子孫を辿ってリーフノードまで行き、モデルを取得する
@@ -586,7 +604,7 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 
 	// スコア表示
 	cv::Mat indicator;
-	computeIndicator(model, scale, indicator);
+	computeIndicator(model, scale, glm::mat4(), indicator);
 	cout << score(indicator, target, cv::Mat::ones(target.size(), CV_8U)) << endl;
 
 
@@ -621,10 +639,10 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	int index = current_model.cursor;
 	if (index < 0) return current_model;
 
-	// expandする変数をマークをつける
+	// expandするリテラルを取得する
 	time_t start = clock();
-	String model = current_model;
-	model.setExpand();
+	String model = current_model.getExpand();
+	//model.setExpand();
 	time_t end = clock();
 	t6 += end - start;
 	fprintf(fp6, "%lf\n", t6);
@@ -636,12 +654,21 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	glm::vec2 curPt = computeCurrentPoint(current_model, scale);
 
 	// マスク画像を作成
-	cv::Mat mask = ml::mat_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), 8);
-	cv::Mat mask2 = ml::mat_mask(target.rows * 4, target.cols * 4, CV_8U, cv::Point(curPt.x * 4, curPt.y * 4), 8 * 4);
+	cv::Mat mask = ml::create_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), 8);
+	cv::Mat mask2 = ml::create_mask(target.rows * 4, target.cols * 4, CV_8U, cv::Point(curPt.x * 4, curPt.y * 4), 8 * 4);
+
+	//ml::mat_save("mask.png", mask);
+	//ml::mat_save("mask2.png", mask2);
 	
+	// ルートノードを作成
 	Node* current_node = new Node(model);
 	current_node->setActions(getActions(model, true));
 
+	// ベースとなるindicator、modelMatを計算
+	cv::Mat baseIndicator;
+	computeIndicator(current_model, scale, glm::mat4(), baseIndicator);
+	glm::mat4 baseModelMat;
+	computeCurrentMat(current_model, scale, baseModelMat);
 
 
 	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
@@ -670,14 +697,12 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		start = clock();
 		if (node->untriedActions.size() > 0) {// && node->children.size() <= ml::log((double)iter * 0.01 + 1, 1.4)) {
 			Action action = node->randomlySelectAction();
-			String child_model = action.apply(node->model, true);
-
-
+			String child_model = action.apply(node->model);
+			
 			action_index = action.action_index;
-
-
+			
 			node = node->addChild(child_model, action);
-			node->setActions(getActions(child_model, true));
+			node->setActions(getActions(child_model));
 			num_nodes++;
 		}
 		end = clock();
@@ -686,12 +711,16 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 		// ランダムにderiveする
 		start = clock();
-		cv::Mat indicator;
 		std::vector<int> derivation_history;
-		String result_model = derive(node->model, MAX_ITERATIONS_FOR_MC, true, indicator, derivation_history);
+		String result_model = derive(node->model, MAX_ITERATIONS_FOR_MC, derivation_history);
 		end = clock();
 		t12 += end - start;
 		fprintf(fp12, "%lf\n", t12);
+
+		// indicatorを計算する
+		cv::Mat indicator;
+		computeIndicator(result_model, scale, baseModelMat, indicator);
+		indicator += baseIndicator;
 
 		// スコアを計算する
 		double sc = score(indicator, target, mask);
@@ -702,17 +731,9 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		/*
 		char filename[256];
 		sprintf(filename, "images/indicator_%d_%d_%d_%lf.png", derivation_step, iter, action_index, sc);
+		cv::Mat img = indicator + target * 0.4;
+		img = ml::mat_mask(img, mask, 0.7);
 
-		computeIndicator(result_model, 10, indicator);
-		cv::Mat target2;
-		cv::resize(target, target2, cv::Size(400, 400));
-
-		cv::Mat img = indicator + target2 * 0.4;
-		cv::Mat img2;
-		cv::subtract(img, cv::Mat::zeros(img.size(), img.type()), img2, mask2);
-		img = img * 0.7 + img2 * 0.3;
-
-		//ml::mat_save(filename, indicator + target2 * 0.4);
 		ml::mat_save(filename, img);
 
 		cout << "   " << filename << " : " << result_model << endl;
@@ -819,7 +840,7 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 	//String best_model = current_node->bestChild()->model;
 	Action best_action = current_node->bestChild()->action;
-	String best_model = best_action.apply(current_model, false);
+	String best_model = best_action.apply(current_model);
 
 	// expandフラグをクリアする
 	best_model.resetExpand();
@@ -1000,6 +1021,34 @@ glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scal
 	p = modelMat * p;
 
 	return glm::vec2(p.x + grid_size * 0.5, p.z);
+}
+
+void ParametricLSystem::computeCurrentMat(const String& model, float scale, glm::mat4& modelMat) {
+	std::list<glm::mat4> stack;
+
+	for (int i = 0; i < model.cursor; ++i) {
+		if (model[i].name == "[") {
+			stack.push_back(modelMat);
+		} else if (model[i].name == "]") {
+			modelMat = stack.back();
+			stack.pop_back();
+		} else if (model[i].name == "+" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
+		} else if (model[i].name == "-" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 1, 0));
+		} else if (model[i].name == "#" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
+		} else if (model[i].name == "\\" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "/" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "F" && model[i].param_defined) {
+			double length = model[i].param_values[0] * scale;
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
+		} else if (model[i].name == "X") {
+		} else {
+		}
+	}
 }
 
 /**
