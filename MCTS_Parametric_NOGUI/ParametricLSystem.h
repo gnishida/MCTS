@@ -38,7 +38,7 @@ public:
 
 public:
 	Literal() {}
-	Literal(const string& name, int depth);
+	Literal(const string& name, int depth, bool param_defined = false);
 	Literal(const string& name, int depth, double param_value);
 	Literal(const string& name, int depth, double param_value1, double param_value2);
 	Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3);
@@ -54,6 +54,7 @@ class String {
 public:
 	vector<Literal> str;
 	int cursor;				// expandするリテラルの位置
+	//priority_queue<int, vector<int>, greater<int> > queue;
 
 public:
 	String() {}
@@ -66,10 +67,10 @@ public:
 	void operator+=(const Literal& l) { str.push_back(l); }
 	void operator+=(const String& str);
 	String operator+(const String& str) const;
-	void replace(int index, const String& str);
-	void setValue(int index, double value);
+	void setValue(double value, bool onlyExpandableLiteral);
+	void replace(const String& str, bool onlyExpandableLiteral);
 
-	void setExpand(int index);
+	void setExpand();
 	void resetExpand();
 	void nextCursor(int depth, bool onlyExpandableLiteral);
 };
@@ -95,7 +96,7 @@ public:
 	Action(int action_index, int index, const String& rule);
 	Action(int action_index, int index, double value);
 
-	String apply(const String& model);
+	String apply(const String& model, bool onlyExpandableLiteral);
 };
 
 /**
@@ -139,19 +140,18 @@ public:
 	map<char, vector<string> > rules;
 
 public:
-	ParametricLSystem(int grid_size, float scale);
-	void draw(const String& model, std::vector<Vertex>& vertices);
+	ParametricLSystem(int grid_size, float scale, const String& axiom);
 	String derive(int random_seed, cv::Mat& indicator);
 	String derive(const String& start_model, int max_iterations, bool onlyExpandableLiteral, cv::Mat& indicator, std::vector<int>& derivation_history);
 	void computeIndicator(const String& model, float scale, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);
-	String UCT(const String& model, const cv::Mat& target, int white_count);
-	double distance(const cv::Mat& indicator, const cv::Mat& target, double alpha = 1.0, double beta = 1.0);
-	double score(const cv::Mat& indicator, const cv::Mat& target, int white_count);
+	String UCT(const String& model, const cv::Mat& target, int derivation_step);
+	double score(const cv::Mat& indicator, const cv::Mat& target, const cv::Mat& mask);
 
 private:
 	std::vector<Action> getActions(const String& model, bool onlyExpandableLiteral = false);
 	int findNextLiteralToDefineValue(const String& model, bool onlyExpandableLiteral = false);
+	glm::vec2 computeCurrentPoint(const String& model, float scale);
 	void releaseNodeMemory(Node* node);
 };
 
