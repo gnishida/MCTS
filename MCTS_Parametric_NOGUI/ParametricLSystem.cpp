@@ -9,35 +9,20 @@
 #define SQR(x)	((x) * (x))
 
 
-#define MAX_ITERATIONS						100//1400//200
+#define MAX_ITERATIONS						800//1400//200
 #define MAX_ITERATIONS_FOR_MC				15
-#define NUM_MONTE_CARLO_SAMPLING			40//100
+#define NUM_MONTE_CARLO_SAMPLING			100
 
 #define PARAM_EXPLORATION					0.3 //1
 #define PARAM_EXPLORATION_VARIANCE			0.1//10
 
 #define LENGTH_ATTENUATION					0.95
 #define SIZE_ATTENUATION					0.034 //0.04
+#define MASK_RADIUS							13
 
 //#define DEBUG		1
 
 namespace parametriclsystem {
-
-
-FILE *fp1, *fp2, *fp3, *fp4, *fp5, *fp6, *fp7, *fp8, *fp9, *fp10, *fp11, *fp12, *fp13;
-double t1 = 0;
-double t2 = 0;
-double t3 = 0;
-double t4 = 0;
-double t5 = 0;
-double t6 = 0;
-double t7 = 0;
-double t8 = 0;
-double t9 = 0;
-double t10 = 0;
-double t11 = 0;
-double t12 = 0;
-double t13 = 0;
 
 const double M_PI = 3.141592653592;
 
@@ -45,7 +30,6 @@ Literal::Literal(const string& name, int depth, bool param_defined) {
 	this->name = name;
 	this->depth = depth;
 	this->param_defined = param_defined;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value) {
@@ -53,7 +37,6 @@ Literal::Literal(const string& name, int depth, double param_value) {
 	this->depth = depth;
 	this->param_values.push_back(param_value);
 	this->param_defined = true;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2) {
@@ -62,7 +45,6 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value1);
 	this->param_values.push_back(param_value2);
 	this->param_defined = true;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3) {
@@ -72,7 +54,6 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value2);
 	this->param_values.push_back(param_value3);
 	this->param_defined = true;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4) {
@@ -83,7 +64,6 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value3);
 	this->param_values.push_back(param_value4);
 	this->param_defined = true;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, double param_value1, double param_value2, double param_value3, double param_value4, double param_value5) {
@@ -95,7 +75,6 @@ Literal::Literal(const string& name, int depth, double param_value1, double para
 	this->param_values.push_back(param_value4);
 	this->param_values.push_back(param_value5);
 	this->param_defined = true;
-	this->expand = false;
 }
 
 Literal::Literal(const string& name, int depth, const std::vector<double>& param_values) {
@@ -103,7 +82,6 @@ Literal::Literal(const string& name, int depth, const std::vector<double>& param
 	this->depth = depth;
 	this->param_values = param_values;
 	this->param_defined = true;
-	this->expand = false;
 }
 
 String Literal::operator+(const Literal& l) const {
@@ -170,48 +148,13 @@ void String::setValue(double value) {
 }
 
 void String::replace(const String& str) {
-	bool expand = this->str[cursor].expand;
 	int depth = this->str[cursor].depth;
 
 	this->str.erase(this->str.begin() + cursor);
 	this->str.insert(this->str.begin() + cursor, str.str.begin(), str.str.end());
 
-	// 展開したリテラルに、expandフラグを引き継ぐ
-	for (int i = cursor; i < cursor + str.length(); ++i) {
-		this->str[i].expand = expand;
-	}
-
 	// 次のリテラルを探す
 	nextCursor(depth);
-}
-
-/**
- * cursor以降のリテラルで、同じレベルのものにexpandマークをつける
- *
- * @param index		index
- */
-void String::setExpand() {
-	int nest = 0;
-	for (int i = cursor; i < str.size(); ++i) {
-		str[i].expand = true;
-
-		if (str[i].name == "[") {
-			nest++;
-		} else if (str[i].name == "]") {
-			nest--;
-		}
-
-		if (nest < 0) break;
-	}
-}
-
-/**
- * expandマークをすべてクリアする
- */
-void String::resetExpand() {
-	for (int i = 0; i < str.size(); ++i) {
-		str[i].expand = false;
-	}
 }
 
 String String::getExpand() const {
@@ -457,7 +400,6 @@ String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
  *
  * @param start_model			開始モデル
  * @param max_iterations		繰り返し数
- * @param onlyExpandableLiteral trueなら、expandマークがついた変数のみ、expandする
  * @param build_tree			木を生成するか？
  * @param indicator [OUT]		生成されたモデルのindicator
  * @return						生成されたモデル
@@ -470,17 +412,8 @@ String ParametricLSystem::derive(const String& start_model, int max_iterations, 
 		if (actions.size() == 0) break;
 
 		int index = ml::genRand(0, actions.size());
-		time_t start = clock();
 		derivation_history.push_back(index);
-		time_t end = clock();
-		t2 += end - start;
-		fprintf(fp2, "%lf\n", t2);
-		start = clock();
 		model = actions[index].apply(model);
-		end = clock();
-		t3 += end - start;
-		fprintf(fp3, "%lf\n", t3);
-		start = clock();
 	}
 
 	return model;
@@ -536,10 +469,10 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 			int u2 = p2.x + size * 0.5;
 			int v2 = p2.z;
 
-			if (radius > 0.2) {
+			//if (radius > 0.1f) {
 				int thickness = max(1.0, radius);
 				cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
-			}
+			//}
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "X") {
@@ -556,21 +489,6 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
  * @return					生成されたモデル
  */
 String ParametricLSystem::inverse(const cv::Mat& target) {
-	fp1 = fopen("time1.txt", "w");
-	fp2 = fopen("time2.txt", "w");
-	fp3 = fopen("time3.txt", "w");
-	fp4 = fopen("time4.txt", "w");
-	fp5 = fopen("time5.txt", "w");
-	fp6 = fopen("time6.txt", "w");
-	fp7 = fopen("time7.txt", "w");
-	fp8 = fopen("time8.txt", "w");
-	fp9 = fopen("time9.txt", "w");
-	fp10 = fopen("time10.txt", "w");
-	fp11 = fopen("time11.txt", "w");
-	fp12 = fopen("time12.txt", "w");
-	fp13 = fopen("time13.txt", "w");
-	
-
 	// UCTを使って探索木を構築していく
 	String model = axiom;
 
@@ -582,48 +500,30 @@ String ParametricLSystem::inverse(const cv::Mat& target) {
 		double sc = score(indicator, target, cv::Mat::ones(target.size(), CV_8U));
 
 		/////// デバッグ ///////
+		/*
 		char filename[256];
 		sprintf(filename, "indicator_%d.png", l);
-		computeIndicator(model, scale, glm::mat4(), indicator);
+		computeIndicator(model, 4, glm::mat4(), indicator);
 
-		ml::mat_save(filename, indicator + target * 0.4);
+		cv::Mat target2;
+		cv::resize(target, target2, cv::Size(400, 400));
+
+		ml::mat_save(filename, indicator + target2 * 0.4);
+		*/
 		/////// デバッグ ///////
 
-		cout << l << ": " << "Best score=" << sc << " : " << model << endl;
-		//cout << l << ": " << "Best score=" << sc << " : " << endl;
-	}
+		//cout << l << ": " << "Best score=" << sc << " : " << model << endl;
+		cout << l << ": " << "Best score=" << sc << " : " << endl;
 
-	// ベストスコアの子孫を辿ってリーフノードまで行き、モデルを取得する
-	/*
-	Node* node = root;
-	while (node->children.size() > 0) {
-		node = node->bestChild();
+		// これ以上、derivationできなら、終了
+		if (model.cursor < 0) break;
 	}
-	model = node->model;
-	*/
 
 	// スコア表示
 	cv::Mat indicator;
 	computeIndicator(model, scale, glm::mat4(), indicator);
 	cout << score(indicator, target, cv::Mat::ones(target.size(), CV_8U)) << endl;
-
-
-
-	fclose(fp1);
-	fclose(fp2);
-	fclose(fp3);
-	fclose(fp4);
-	fclose(fp5);
-	fclose(fp6);
-	fclose(fp7);
-	fclose(fp8);
-	fclose(fp9);
-	fclose(fp10);
-	fclose(fp11);
-	fclose(fp12);
-	fclose(fp13);
-
-
+	
 	return model;
 }
 
@@ -640,12 +540,7 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	if (index < 0) return current_model;
 
 	// expandするリテラルを取得する
-	time_t start = clock();
 	String model = current_model.getExpand();
-	//model.setExpand();
-	time_t end = clock();
-	t6 += end - start;
-	fprintf(fp6, "%lf\n", t6);
 
 	// 現在のカーソルのdepthを取得
 	int depth = current_model[current_model.cursor].depth;
@@ -654,22 +549,18 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	glm::vec2 curPt = computeCurrentPoint(current_model, scale);
 
 	// マスク画像を作成
-	cv::Mat mask = ml::create_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), 8);
-	cv::Mat mask2 = ml::create_mask(target.rows * 4, target.cols * 4, CV_8U, cv::Point(curPt.x * 4, curPt.y * 4), 8 * 4);
-
-	//ml::mat_save("mask.png", mask);
-	//ml::mat_save("mask2.png", mask2);
+	cv::Mat mask = ml::create_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), MASK_RADIUS);
+	cv::Mat mask2 = ml::create_mask(target.rows * 4, target.cols * 4, CV_8U, cv::Point(curPt.x * 4, curPt.y * 4), MASK_RADIUS * 4);
 	
 	// ルートノードを作成
 	Node* current_node = new Node(model);
-	current_node->setActions(getActions(model, true));
+	current_node->setActions(getActions(model));
 
 	// ベースとなるindicator、modelMatを計算
 	cv::Mat baseIndicator;
 	computeIndicator(current_model, scale, glm::mat4(), baseIndicator);
 	glm::mat4 baseModelMat;
 	computeCurrentMat(current_model, scale, baseModelMat);
-
 
 	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
 		// もしノードがリーフノードなら、終了
@@ -681,41 +572,23 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		Node* node = current_node;
 
 		// 探索木のリーフノードを選択
-		start = clock();
 		while (node->untriedActions.size() == 0 && node->children.size() > 0) {
 			node = node->UCTSelectChild();
 		}
-		end = clock();
-		t7 += end - start;
-		fprintf(fp7, "%lf\n", t7);
-
-		/////// デバッグ ///////
-		int action_index;
-		/////// デバッグ ///////
 
 		// 子ノードがまだ全てexpandされていない時は、1つランダムにexpand
-		start = clock();
 		if (node->untriedActions.size() > 0) {// && node->children.size() <= ml::log((double)iter * 0.01 + 1, 1.4)) {
 			Action action = node->randomlySelectAction();
 			String child_model = action.apply(node->model);
-			
-			action_index = action.action_index;
-			
+						
 			node = node->addChild(child_model, action);
 			node->setActions(getActions(child_model));
 			num_nodes++;
 		}
-		end = clock();
-		t8 += end - start;
-		fprintf(fp8, "%lf\n", t8);
 
 		// ランダムにderiveする
-		start = clock();
 		std::vector<int> derivation_history;
 		String result_model = derive(node->model, MAX_ITERATIONS_FOR_MC, derivation_history);
-		end = clock();
-		t12 += end - start;
-		fprintf(fp12, "%lf\n", t12);
 
 		// indicatorを計算する
 		cv::Mat indicator;
@@ -748,7 +621,6 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 		}
 
 		// スコアをbackpropagateする
-		start = clock();
 		bool updated = false;
 		Node* leaf = node;
 		while (node != NULL) {
@@ -773,49 +645,6 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 			node = node->parent;
 		}
-		end = clock();
-		t9 += end - start;
-		fprintf(fp9, "%lf\n", t9);
-
-
-		// ベストスコアを更新した場合は、このderivation上のノードを全て実体化する
-#if 0
-		if (updated) {
-
-			/////// デバッグ ///////
-			/*
-			char filename[256];
-			sprintf(filename, "indicator_%lf.png", sc);
-			ml::mat_save(filename, indicator);
-			*/
-			/////// デバッグ ///////
-
-
-			Node* node = leaf;
-			for (int di = 0; di < min((int)derivation_history.size(), 10); ++di) {
-				Node* c = node->getChild(derivation_history[di]);
-				if (c == NULL) {
-					node->removeAction(derivation_history[di]);
-					String child_model = node->actions[derivation_history[di]].apply(node->model);
-
-					c = node->addChild(child_model, node->actions[derivation_history[di]]);
-					c->setActions(getActions(child_model, true));
-					num_nodes++;
-				}
-
-				c->visits++;
-				c->best_score = sc;
-				c->scores.push_back(sc);
-
-				node = c;
-				
-				// リーフノードなら、スコアを確定する
-				if (node->untriedActions.size() == 0 && node->children.size() == 0) {
-					node->fixed = true;
-				}
-			}
-		}
-#endif
 	}
 
 
@@ -838,19 +667,30 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	////// デバッグ //////
 
 
-	//String best_model = current_node->bestChild()->model;
 	Action best_action = current_node->bestChild()->action;
 	String best_model = best_action.apply(current_model);
 
-	// expandフラグをクリアする
-	best_model.resetExpand();
+
+
+	/////// デバッグ ///////
+	/*
+	char filename[256];
+	computeIndicator(best_model, 4, glm::mat4(), bestIndicator);
+	sprintf(filename, "images/indicator_%d.png", derivation_step);
+
+	cv::Mat target2;
+	cv::resize(target, target2, cv::Size(400, 400));
+	cv::Mat img = bestIndicator + target2 * 0.4;
+	img = ml::mat_mask(img, mask2, 0.8);
+
+	ml::mat_save(filename, img);
+	*/
+	/////// デバッグ ///////
+
+
 
 	// 探索木のメモリを解放する
-	start = clock();
 	releaseNodeMemory(current_node);
-	end = clock();
-	t11 += end - start;
-	fprintf(fp11, "%lf\n", t11);
 	
 	return best_model;
 }
@@ -889,21 +729,15 @@ double ParametricLSystem::score(const cv::Mat& indicator, const cv::Mat& target,
  * @param model		モデル
  * @return			次のderivationの候補リスト
  */
-std::vector<Action> ParametricLSystem::getActions(const String& model, bool onlyExpandableLiteral) {
+std::vector<Action> ParametricLSystem::getActions(const String& model) {
 	std::vector<Action> actions;
 
 	// 展開するパラメータを決定
-	time_t start = clock();
-	//int i = findNextLiteralToDefineValue(model, onlyExpandableLiteral);
 	int i = model.cursor;
-	time_t end = clock();
-	t1 += end - start;
-	fprintf(fp1, "%lf\n", t1);
 
 	// 新たなderivationがないなら、終了
 	if (i == -1) return actions;
 
-	start = clock();
 	if (model[i].name == "X") {
 		//String rule = Literal("F", model[i].depth + 1, 0, 0);
 		String rule;
@@ -944,46 +778,7 @@ std::vector<Action> ParametricLSystem::getActions(const String& model, bool only
 		}
 	}
 
-	end = clock();
-	t13 += end - start;
-	fprintf(fp13, "%lf\n", t13);
-
 	return actions;
-}
-
-/**
- * 現在のモデルについて、値が未設定のパラメータで最もレベルが低く、最も左側に位置するindexを返却する。
- * もし未設定のパラメータがない場合は、-1を返却する。
- *
- * @param model					現在のモデル
- * @param onlyExpandableLiteral trueなら、expandマークがついた変数のみが対象
- * @return						インデックス
- */
-int ParametricLSystem::findNextLiteralToDefineValue(const String& model, bool onlyExpandableLiteral) {
-	int min_depth1 = std::numeric_limits<int>::max();
-	int min_depth2 = std::numeric_limits<int>::max();
-	int min_index1 = -1;
-	int min_index2 = -1;
-
-	for (int i = model.cursor; i < model.length(); ++i) {
-		if (model[i].type() == Literal::TYPE_NONTERMINAL && (!onlyExpandableLiteral || model[i].expand)) {
-			if (model[i].depth < min_depth1) {
-				min_depth1 = model[i].depth;
-				min_index1 = i;
-			}
-		} else if (model[i].type() == Literal::TYPE_TERMINAL && !model[i].param_defined && (!onlyExpandableLiteral || model[i].expand)) {
-			if (model[i].depth < min_depth2) {
-				min_depth2 = model[i].depth;
-				min_index2 = i;
-			}
-		}
-	}
-
-	if (min_depth1 < min_depth2) {
-		return min_index1;
-	} else {
-		return min_index2;
-	}
 }
 
 glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scale) {

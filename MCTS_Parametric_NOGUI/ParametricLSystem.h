@@ -34,7 +34,6 @@ public:
 	int depth;
 	std::vector<double> param_values;
 	bool param_defined;
-	bool expand;
 
 public:
 	Literal() {}
@@ -150,8 +149,7 @@ public:
 	double score(const cv::Mat& indicator, const cv::Mat& target, const cv::Mat& mask);
 
 private:
-	std::vector<Action> getActions(const String& model, bool onlyExpandableLiteral = false);
-	int findNextLiteralToDefineValue(const String& model, bool onlyExpandableLiteral = false);
+	std::vector<Action> getActions(const String& model);
 	glm::vec2 computeCurrentPoint(const String& model, float scale);
 	void computeCurrentMat(const String& model, float scale, glm::mat4& modelMmat);
 	void releaseNodeMemory(Node* node);
