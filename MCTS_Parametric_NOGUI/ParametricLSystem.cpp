@@ -9,7 +9,7 @@
 #define SQR(x)	((x) * (x))
 
 
-#define MAX_ITERATIONS						800//1400//200
+#define MAX_ITERATIONS						400//1400//200
 #define MAX_ITERATIONS_FOR_MC				15
 #define NUM_MONTE_CARLO_SAMPLING			100
 
@@ -18,7 +18,7 @@
 
 #define LENGTH_ATTENUATION					0.95
 #define SIZE_ATTENUATION					0.034 //0.04
-#define MASK_RADIUS							13
+#define MASK_RADIUS							12
 
 //#define DEBUG		1
 

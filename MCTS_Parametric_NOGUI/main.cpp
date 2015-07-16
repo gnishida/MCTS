@@ -8,7 +8,7 @@ using namespace std;
 
 int main() {
 	// ターゲットindicatorを読み込む
-	cv::Mat target = cv::imread("target_indicator7.png", 0);
+	cv::Mat target = cv::imread("target_indicator2.png", 0);
 	target.convertTo(target, CV_32F, 1.0/255.0);
 	cv::flip(target, target, 0);
 
