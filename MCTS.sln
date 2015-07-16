@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCTS_Parametric", "MCTS_Par
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCTS_Parametric_NOGUI", "MCTS_Parametric_NOGUI\MCTS_Parametric_NOGUI.vcxproj", "{0064977C-B9F4-409D-AE49-6B08D9EDE92D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCTS_Robot", "MCTS_Robot\MCTS_Robot.vcxproj", "{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -46,11 +48,17 @@ Global
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Debug|Win32.ActiveCfg = Debug|Win32
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Debug|Win32.Build.0 = Debug|Win32
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Debug|x64.ActiveCfg = Debug|x64
-		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Debug|x64.Build.0 = Debug|x64
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Release|Win32.ActiveCfg = Release|Win32
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Release|Win32.Build.0 = Release|Win32
 		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Release|x64.ActiveCfg = Release|x64
-		{0064977C-B9F4-409D-AE49-6B08D9EDE92D}.Release|x64.Build.0 = Release|x64
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Debug|Win32.Build.0 = Debug|Win32
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Debug|x64.ActiveCfg = Debug|x64
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Debug|x64.Build.0 = Debug|x64
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Release|Win32.ActiveCfg = Release|Win32
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Release|Win32.Build.0 = Release|Win32
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Release|x64.ActiveCfg = Release|x64
+		{480A6B2E-D8FA-4AD7-826D-6190087FBC3C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
