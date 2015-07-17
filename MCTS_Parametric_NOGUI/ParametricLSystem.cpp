@@ -499,14 +499,10 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 			int u2 = p2.x + size * 0.5;
 			int v2 = p2.z;
 
-			//if (radius > 0.1f) {
-				int thickness = max(1.0, radius);
-				cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
-			//}
+			int thickness = max(1.0, radius);
+			cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
-		} else if (model[i].name == "X") {
-		} else {
 		}
 	}
 }

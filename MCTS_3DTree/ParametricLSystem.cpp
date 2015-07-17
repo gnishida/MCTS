@@ -479,8 +479,6 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			glutils::drawCone(glm::vec3(0, 0, 0), length, radius1, radius2, glm::vec3(1, 1, 1), modelMat, vertices);
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
-		} else if (model[i].name == "X") {
-		} else {
 		}
 	}
 	this->axiom = axiom;
