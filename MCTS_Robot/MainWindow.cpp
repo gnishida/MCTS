@@ -25,10 +25,9 @@ void MainWindow::onSaveImage() {
 
 void MainWindow::onRandomGeneration() {
 	cv::Mat indicator;
-	glWidget->model = glWidget->lsystem.derive(1234, indicator);
+	glWidget->model = glWidget->lsystem.derive(1234);
 
 	cout << glWidget->model << endl;
-	ml::mat_save("indicator.png", indicator);
 
 	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
 	glWidget->createVAO();

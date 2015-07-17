@@ -395,13 +395,15 @@ ParametricLSystem::ParametricLSystem(int grid_size, float scale, const String& a
  * @param random_seed		乱数シード
  * @return					生成されたモデル
  */
-String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
+String ParametricLSystem::derive(int random_seed) {
 	std::vector<int> derivation_history;
 
+	String result_model;
 	ml::initRand(random_seed);
-	String result_model = derive(axiom, MAX_ITERATIONS, derivation_history);
-
-	computeIndicator(result_model, scale, glm::mat4(), indicator);
+	while (true) {
+		result_model = derive(axiom, MAX_ITERATIONS, derivation_history);
+		if (result_model.length() > 0) break;
+	}
 
 	return result_model;
 }
@@ -815,7 +817,7 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 		String rule;
 		actions.push_back(Action(0, i, rule));
 
-		if (model[i].param_values[0] >= 0.01f) {
+		if (model[i].param_values[1] >= 0.01f) {
 			String rule = Literal("F", model[i].depth + 1, model[i].param_values[0], model[i].param_values[1])
 				+ Literal("#", model[i].depth + 1)
 				+ Literal("\\", model[i].depth + 1, 40.0)

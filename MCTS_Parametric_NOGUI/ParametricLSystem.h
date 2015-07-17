@@ -143,7 +143,7 @@ public:
 
 public:
 	ParametricLSystem(int grid_size, float scale, const String& axiom);
-	String derive(int random_seed, cv::Mat& indicator);
+	String derive(int random_seed);
 	String derive(const String& start_model, int max_iterations, std::vector<int>& derivation_history);
 	void computeIndicator(const String& model, float scale, const glm::mat4& baseModelMat, cv::Mat& indicator);
 	String inverse(const cv::Mat& target);

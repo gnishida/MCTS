@@ -395,13 +395,15 @@ ParametricLSystem::ParametricLSystem(int grid_size, float scale, const String& a
  * @param random_seed		乱数シード
  * @return					生成されたモデル
  */
-String ParametricLSystem::derive(int random_seed, cv::Mat& indicator) {
+String ParametricLSystem::derive(int random_seed) {
 	std::vector<int> derivation_history;
 
+	String result_model;
 	ml::initRand(random_seed);
-	String result_model = derive(axiom, MAX_ITERATIONS, derivation_history);
-
-	computeIndicator(result_model, scale, glm::mat4(), indicator);
+	while (true) {
+		result_model = derive(axiom, MAX_ITERATIONS, derivation_history);
+		if (result_model.length() > 0) break;
+	}
 
 	return result_model;
 }
