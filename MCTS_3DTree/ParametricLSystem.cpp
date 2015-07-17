@@ -502,16 +502,24 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 
 	glm::mat4 modelMat = baseModelMat;
 
+	int undefined = 0;
 	for (int i = 0; i < model.length(); ++i) {
-		if (!model[i].param_defined) break;
+		if (undefined == 0 && !model[i].param_defined) {
+			undefined = 1;
+			continue;
+		}
 
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
+			if (undefined > 0) undefined++;
 		} else if (model[i].name == "]") {
 			if (!stack.empty()) {
 				modelMat = stack.back();
 				stack.pop_back();
+				if (undefined > 0) undefined--;
 			}
+		} else if (undefined > 0) {
+			continue;
 		} else if (model[i].name == "+" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
 		} else if (model[i].name == "-" && model[i].param_defined) {
@@ -544,14 +552,10 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 			int u2 = p2.x + size * 0.5;
 			int v2 = p2.z;
 
-			//if (radius > 0.1f) {
-				int thickness = max(1.0, radius);
-				cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
-			//}
+			int thickness = max(1.0, radius);
+			cv::line(indicator, cv::Point(u1, v1), cv::Point(u2, v2), cv::Scalar(1), thickness);
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
-		} else if (model[i].name == "X") {
-		} else {
 		}
 	}
 }
@@ -626,7 +630,6 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 	// マスク画像を作成
 	cv::Mat mask = ml::create_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), MASK_RADIUS);
-	cv::Mat mask2 = ml::create_mask(target.rows * 4, target.cols * 4, CV_8U, cv::Point(curPt.x * 4, curPt.y * 4), MASK_RADIUS * 4);
 	
 	// ルートノードを作成
 	Node* current_node = new Node(model);
