@@ -90,7 +90,7 @@ String Literal::operator+(const Literal& l) const {
 }
 
 int Literal::type() {
-	if (name == "F" || name == "f" || name == "[" || name == "]" || name == "+" || name == "-" || name == "\\" || name == "/" || name == "^" || name == "&" || name == "#" || name == "$") {
+	if (name == "F" || name == "f" || name == "[" || name == "]" || name == "+" || name == "-" || name == "\\" || name == "/" || name == "&" || name == "^" || name == "#") {
 		return TYPE_TERMINAL;
 	} else {
 		return TYPE_NONTERMINAL;
@@ -247,6 +247,17 @@ String Action::apply(const String& model) {
 	}
 
 	return new_model;
+}
+
+ostream& operator<<(ostream& os, const Action& a) {
+	os << "type(";
+	if (a.type == Action::ACTION_RULE) {
+		os << "Rule" << "): " << a.rule;
+	} else {
+		os << "Value" << "): " << a.value;
+	}
+
+	return os;
 }
 
 Node::Node(const String& model) {
@@ -446,6 +457,12 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "/" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "&" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "^" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "f" && model[i].param_defined) {
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, model[i].param_values[0] * scale));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			double radius1 = model[i].param_values[1] * scale;
@@ -484,6 +501,8 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 	glm::mat4 modelMat = baseModelMat;
 
 	for (int i = 0; i < model.length(); ++i) {
+		if (!model[i].param_defined) break;
+
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
 		} else if (model[i].name == "]") {
@@ -501,6 +520,12 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "/" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "&" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "^" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "f" && model[i].param_defined) {
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, model[i].param_values[0] * scale));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			double radius1 = model[i].param_values[1] * scale;
@@ -594,7 +619,8 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	int depth = current_model[current_model.cursor].depth;
 
 	// 現在の座標を計算
-	glm::vec2 curPt = computeCurrentPoint(current_model, scale);
+	glm::mat4 baseModelMat;
+	glm::vec2 curPt = computeCurrentPoint(current_model, scale, baseModelMat);
 
 	// マスク画像を作成
 	cv::Mat mask = ml::create_mask(target.rows, target.cols, CV_8U, cv::Point(curPt.x, curPt.y), MASK_RADIUS);
@@ -604,11 +630,9 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 	Node* current_node = new Node(model);
 	current_node->setActions(getActions(model));
 
-	// ベースとなるindicator、modelMatを計算
+	// ベースとなるindicatorを計算
 	cv::Mat baseIndicator;
 	computeIndicator(current_model, scale, glm::mat4(), baseIndicator);
-	glm::mat4 baseModelMat;
-	computeCurrentMat(current_model, scale, baseModelMat);
 
 	for (int iter = 0; iter < NUM_MONTE_CARLO_SAMPLING; ++iter) {
 		// もしノードがリーフノードなら、終了
@@ -831,12 +855,10 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 	return actions;
 }
 
-glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scale) {
+glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scale, glm::mat4& modelMat) {
 	int size = grid_size * scale;
 
 	std::list<glm::mat4> stack;
-
-	glm::mat4 modelMat;
 
 	for (int i = 0; i < model.cursor; ++i) {
 		if (model[i].name == "[") {
@@ -854,6 +876,13 @@ glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scal
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "/" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "&" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "^" && model[i].param_defined) {
+			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(1, 0, 0));
+		} else if (model[i].name == "f" && model[i].param_defined) {
+			double length = model[i].param_values[0] * scale;
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
@@ -866,34 +895,6 @@ glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scal
 	p = modelMat * p;
 
 	return glm::vec2(p.x + grid_size * 0.5, p.z);
-}
-
-void ParametricLSystem::computeCurrentMat(const String& model, float scale, glm::mat4& modelMat) {
-	std::list<glm::mat4> stack;
-
-	for (int i = 0; i < model.cursor; ++i) {
-		if (model[i].name == "[") {
-			stack.push_back(modelMat);
-		} else if (model[i].name == "]") {
-			modelMat = stack.back();
-			stack.pop_back();
-		} else if (model[i].name == "+" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
-		} else if (model[i].name == "-" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 1, 0));
-		} else if (model[i].name == "#" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 1, 0));
-		} else if (model[i].name == "\\" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
-		} else if (model[i].name == "/" && model[i].param_defined) {
-			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
-		} else if (model[i].name == "F" && model[i].param_defined) {
-			double length = model[i].param_values[0] * scale;
-			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
-		} else if (model[i].name == "X") {
-		} else {
-		}
-	}
 }
 
 /**

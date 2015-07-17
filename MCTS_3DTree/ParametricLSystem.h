@@ -99,6 +99,8 @@ public:
 	String apply(const String& model);
 };
 
+ostream& operator<<(ostream& os, const Action& a);
+
 /**
  * MCTS用のノードクラス
  */
@@ -151,8 +153,7 @@ public:
 
 private:
 	std::vector<Action> getActions(const String& model);
-	glm::vec2 computeCurrentPoint(const String& model, float scale);
-	void computeCurrentMat(const String& model, float scale, glm::mat4& modelMmat);
+	glm::vec2 computeCurrentPoint(const String& model, float scale, glm::mat4& modelMmat);
 	void releaseNodeMemory(Node* node);
 };
 
