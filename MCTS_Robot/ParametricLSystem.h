@@ -99,6 +99,8 @@ public:
 	String apply(const String& model);
 };
 
+ostream& operator<<(ostream& os, const Action& a);
+
 /**
  * MCTS用のノードクラス
  */

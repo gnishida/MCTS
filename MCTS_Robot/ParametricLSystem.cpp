@@ -9,16 +9,16 @@
 #define SQR(x)	((x) * (x))
 
 
-#define MAX_ITERATIONS						400//1400//200
-#define MAX_ITERATIONS_FOR_MC				15
-#define NUM_MONTE_CARLO_SAMPLING			100
+#define MAX_ITERATIONS						200//1400//200
+#define MAX_ITERATIONS_FOR_MC				25//15
+#define NUM_MONTE_CARLO_SAMPLING			100//100
 
 #define PARAM_EXPLORATION					0.3 //1
 #define PARAM_EXPLORATION_VARIANCE			0.1//10
 
 #define LENGTH_ATTENUATION					0.95
 #define SIZE_ATTENUATION					0.034 //0.04
-#define MASK_RADIUS							36
+#define MASK_RADIUS							300//36
 
 //#define DEBUG		1
 
@@ -247,6 +247,17 @@ String Action::apply(const String& model) {
 	}
 
 	return new_model;
+}
+
+ostream& operator<<(ostream& os, const Action& a) {
+	os << "type(";
+	if (a.type == Action::ACTION_RULE) {
+		os << "Rule" << "): " << a.rule;
+	} else {
+		os << "Value" << "): " << a.value;
+	}
+
+	return os;
 }
 
 Node::Node(const String& model) {
@@ -494,6 +505,8 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 	glm::mat4 modelMat = baseModelMat;
 
 	for (int i = 0; i < model.length(); ++i) {
+		if (!model[i].param_defined) break;
+
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
 		} else if (model[i].name == "]") {
@@ -519,7 +532,7 @@ void ParametricLSystem::computeIndicator(const String& model, float scale, const
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, model[i].param_values[0] * scale));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
-			double radius = model[i].param_values[1] * scale;
+			double radius = model[i].param_values[1] * 2.0 * scale;
 
 			// 線を描画する代わりに、indicatorを更新する
 			glm::vec4 p1(0, 0, 0, 1);
@@ -671,15 +684,16 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 
 		/////// デバッグ ///////
-		/*
+		/*if (derivation_step == 5) {
 		char filename[256];
-		sprintf(filename, "images/indicator_%d_%d_%d_%lf.png", derivation_step, iter, action_index, sc);
+		sprintf(filename, "images/indicator_%lf_%d_%d_%lf.png", result_model[0].param_values[0], derivation_step, iter, sc);
 		cv::Mat img = indicator + target * 0.4;
 		img = ml::mat_mask(img, mask, 0.7);
 
 		ml::mat_save(filename, img);
 
 		cout << "   " << filename << " : " << result_model << endl;
+		}
 		*/
 		/////// デバッグ ///////
 
@@ -738,6 +752,7 @@ String ParametricLSystem::UCT(const String& current_model, const cv::Mat& target
 
 
 	Action best_action = current_node->bestChild()->action;
+	cout << "Best action: " << best_action << endl;
 	String best_model = best_action.apply(current_model);
 
 
@@ -810,8 +825,9 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 
 	if (model[i].name == "X") {
 		String rule = 
+			Literal("\\", model[i].depth + 1)
 			// 胴体と頭
-			Literal("[", model[i].depth + 1, true)
+			+ Literal("[", model[i].depth + 1, true)
 			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.3, model[i].param_values[0] * 0.15)
 			+ Literal("\\", model[i].depth + 1)
 			+ Literal("f", model[i].depth + 1, model[i].param_values[0] * 0.1)
@@ -829,9 +845,9 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 			+ Literal("f", model[i].depth + 1, model[i].param_values[0] * 0.05)
 			+ Literal("+", model[i].depth + 1, 90.0)
 			+ Literal("f", model[i].depth + 1, model[i].param_values[0] * 0.05)
-			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.15, model[i].param_values[0] * 0.03)
-			+ Literal("^", model[i].depth + 1)
-			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.15, model[i].param_values[0] * 0.03)
+			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.18, model[i].param_values[0] * 0.05)
+			+ Literal("&", model[i].depth + 1)
+			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.18, model[i].param_values[0] * 0.05)
 			+ Literal("]", model[i].depth + 1, true)
 			// 右腕
 			+ Literal("[", model[i].depth + 1, true)
@@ -845,9 +861,9 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 			+ Literal("f", model[i].depth + 1, model[i].param_values[0] * 0.05)
 			+ Literal("-", model[i].depth + 1, 90.0)
 			+ Literal("f", model[i].depth + 1, model[i].param_values[0] * 0.05)
-			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.15, model[i].param_values[0] * 0.03)
+			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.18, model[i].param_values[0] * 0.05)
 			+ Literal("&", model[i].depth + 1)
-			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.15, model[i].param_values[0] * 0.03)
+			+ Literal("F", model[i].depth + 1, model[i].param_values[0] * 0.18, model[i].param_values[0] * 0.05)
 			+ Literal("]", model[i].depth + 1, true)
 			// 腰
 			+ Literal("+", model[i].depth + 1, 180.0)
@@ -856,7 +872,7 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 		actions.push_back(Action(0, i, rule));
 	} else if (model[i].name == "-" || model[i].name == "+") {
 		int count = 0;
-		for (int k = -80; k <= 80; k += 20, ++count) {
+		for (int k = 0; k <= 80; k += 20, ++count) {
 			if (k == 0) continue;
 			actions.push_back(Action(count, i, k));
 		}
@@ -867,7 +883,7 @@ std::vector<Action> ParametricLSystem::getActions(const String& model) {
 		}
 	} else if (model[i].name == "\\") {
 		int count = 0;
-		for (int k = -80; k <= 80; k += 20, ++count) {
+		for (int k = -60; k <= 60; k += 10, ++count) {
 			actions.push_back(Action(count, i, k));
 		}
 	} else if (model[i].name == "&" || model[i].name == "^") {
@@ -888,6 +904,8 @@ glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scal
 	glm::mat4 modelMat;
 
 	for (int i = 0; i < model.cursor; ++i) {
+		//if (!model[i].param_defined) break;
+
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
 		} else if (model[i].name == "]") {
@@ -903,6 +921,9 @@ glm::vec2 ParametricLSystem::computeCurrentPoint(const String& model, float scal
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "/" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "f" && model[i].param_defined) {
+			double length = model[i].param_values[0] * scale;
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
@@ -921,6 +942,8 @@ void ParametricLSystem::computeCurrentMat(const String& model, float scale, glm:
 	std::list<glm::mat4> stack;
 
 	for (int i = 0; i < model.cursor; ++i) {
+		//if (!model[i].param_defined) break;
+
 		if (model[i].name == "[") {
 			stack.push_back(modelMat);
 		} else if (model[i].name == "]") {
@@ -936,6 +959,9 @@ void ParametricLSystem::computeCurrentMat(const String& model, float scale, glm:
 			modelMat = glm::rotate(modelMat, deg2rad(model[i].param_values[0]), glm::vec3(0, 0, 1));
 		} else if (model[i].name == "/" && model[i].param_defined) {
 			modelMat = glm::rotate(modelMat, deg2rad(-model[i].param_values[0]), glm::vec3(0, 0, 1));
+		} else if (model[i].name == "f" && model[i].param_defined) {
+			double length = model[i].param_values[0] * scale;
+			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "F" && model[i].param_defined) {
 			double length = model[i].param_values[0] * scale;
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
