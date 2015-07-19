@@ -474,9 +474,7 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			p = modelMat * p;
 			// 線を描画する
 			std::vector<Vertex> new_vertices;
-			//glutils::drawSphere(glm::vec3(0, 0, 0), radius1, glm::vec3(1, 1, 1), modelMat, vertices);
-			//glutils::drawCylinder(glm::vec3(0, 0, 0), length, radius1, glm::vec3(1, 1, 1), modelMat, vertices);
-			glutils::drawCone(glm::vec3(0, 0, 0), length, radius1, radius2, glm::vec3(1, 1, 1), modelMat, vertices);
+			glutils::drawCylinder(radius1, radius2, length, glm::vec3(1, 1, 1), modelMat, vertices);
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		}

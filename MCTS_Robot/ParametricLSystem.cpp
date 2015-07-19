@@ -473,7 +473,7 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			p = modelMat * p;
 			// 線を描画する
 			std::vector<Vertex> new_vertices;
-			glutils::drawCylinder(glm::vec3(0, 0, 0), length, radius, glm::vec3(1, 1, 1), modelMat, vertices);
+			glutils::drawCylinder(radius, radius, length, glm::vec3(1, 1, 1), modelMat, vertices);
 
 			modelMat = glm::translate(modelMat, glm::vec3(0, 0, length));
 		} else if (model[i].name == "S" && model[i].param_defined) {
@@ -483,7 +483,7 @@ void ParametricLSystem::draw(const String& model, std::vector<Vertex>& vertices)
 			p = modelMat * p;
 			// 線を描画する
 			std::vector<Vertex> new_vertices;
-			glutils::drawSphere(glm::vec3(0, 0, 0), radius, glm::vec3(1, 1, 1), modelMat, vertices);
+			glutils::drawSphere(radius, glm::vec3(1, 1, 1), modelMat, vertices);
 		}
 	}
 	this->axiom = axiom;
