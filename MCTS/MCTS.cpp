@@ -351,7 +351,7 @@ namespace mcts {
 		
 		std::vector<Vertex> vertices;
 		generateGeometry(&glWidget->renderManager, glm::mat4(), 3.0f, 0.3f, derivationTree.root, vertices);
-		glWidget->renderManager.addObject("tree", "", vertices);
+		glWidget->renderManager.addObject("tree", "", vertices, true);
 		glWidget->render();
 
 
