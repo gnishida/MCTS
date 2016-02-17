@@ -1,59 +1,46 @@
-﻿#include "MainWindow.h"
-#include "MLUtils.h"
-#include <time.h>
+#include "MainWindow.h"
+#include <QFileDialog>
 
-MainWindow::MainWindow(QWidget *parent, Qt::WFlags flags) : QMainWindow(parent, flags) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 	ui.setupUi(this);
 
 	connect(ui.actionExit, SIGNAL(triggered()), this, SLOT(close()));
-	connect(ui.actionRandomGeneration, SIGNAL(triggered()), this, SLOT(onRandomGeneration()));
-	connect(ui.actionGreedyInverse, SIGNAL(triggered()), this, SLOT(onGreedyInverse()));
+	connect(ui.actionClearImage, SIGNAL(triggered()), this, SLOT(onClearImage()));
+	connect(ui.actionOpenImage, SIGNAL(triggered()), this, SLOT(onOpenImage()));
+	connect(ui.actionSaveImage, SIGNAL(triggered()), this, SLOT(onSaveImage()));
+	connect(ui.actionSave3DMesh, SIGNAL(triggered()), this, SLOT(onSave3DMesh()));
+	connect(ui.actionMCTS, SIGNAL(triggered()), this, SLOT(onMCTS()));
 
 	glWidget = new GLWidget3D(this);
 	setCentralWidget(glWidget);
 }
 
-void MainWindow::onRandomGeneration() {
-	cv::Mat indicator;
-	glWidget->model = glWidget->lsystem.derive(3, indicator);
-
-	cout << glWidget->model << endl;
-	ml::mat_save("indicator.png", indicator);
-
-	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
-	glWidget->createVAO();
-	glWidget->updateGL();
+void MainWindow::onClearImage() {
+	glWidget->clearImage();
+	glWidget->update();
 }
 
-void MainWindow::onGreedyInverse() {
-	// ターゲットindicatorを読み込む
-	cv::Mat target = cv::imread("target_indicator2.png", 0);
-	target.convertTo(target, CV_32F, 1.0/255.0);
-	cv::flip(target, target, 0);
+void MainWindow::onOpenImage() {
+	QString filename = QFileDialog::getOpenFileName(this, tr("Open image file..."), "", tr("Image Files (*.png)"));
+	if (filename.isEmpty()) return;
 
-	// 白黒を反転させる
-	target = 1 - target;
+	glWidget->loadImage(filename);
+}
 
-	// ターゲットに近いモデルを生成する
-	time_t start = clock();
-	glWidget->model = glWidget->lsystem.inverse(target);
-	time_t end = clock();
+void MainWindow::onSaveImage() {
+	QString filename = QFileDialog::getSaveFileName(this, tr("Save image file..."), "", tr("Image Files (*.png)"));
+	if (filename.isEmpty()) return;
 
-	cout << glWidget->model << endl;
+	glWidget->saveImage(filename);
+}
 
-	cout << fixed << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC  << " [sec]" << endl;
+void MainWindow::onSave3DMesh() {
+	QString filename = QFileDialog::getSaveFileName(this, tr("Save obj file..."), "", tr("OBJ Files (*.obj)"));
+	if (filename.isEmpty()) return;
 
-	// 生成したモデルの画像を保存する
-	cv::Mat img;
-	glWidget->lsystem.computeIndicator(glWidget->model, 1.0f, img);
-	/*
-	cv::resize(target, target, cv::Size(300, 300));
-	target.convertTo(target, CV_32F, 0.4);
-	img += target;
-	*/
-	ml::mat_save("result.png", img);
+	glWidget->save3DMesh(filename);
+}
 
-	glWidget->lsystem.draw(glWidget->model, glWidget->vertices);
-	glWidget->createVAO();
-	glWidget->updateGL();
+void MainWindow::onMCTS() {
+	glWidget->runMCTS();
 }

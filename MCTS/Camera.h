@@ -9,18 +9,20 @@ public:
 
 	void mousePress(int mouse_x, int mouse_y);
 	void rotate(int mouse_x, int mouse_y);
-	void zoom(int mouse_x, int mouse_y);
+	//void zoom(int mouse_x, int mouse_y);
+	void zoom(float delta);
 	void move(int mouse_x, int mouse_y);
+	float f() { return _f; }
+	float aspect() { return _aspect; }
 	void updatePMatrix(int width,int height);
-	void resetCamera();
-	void saveCameraPose(char* filename);
-	void loadCameraPose(char* filename);
-
-private:
 	void updateMVPMatrix();
+	glm::vec3 cameraPosInWorld();
+	glm::vec3 cameraViewDir();
 
-private:
+public:
 	float fovy;
+	float _f;
+	float _aspect;
 	glm::vec3 pos;
 	float xrot;
 	float yrot;

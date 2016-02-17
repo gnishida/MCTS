@@ -1,6 +1,7 @@
 ﻿#include "ShadowMapping.h"
 #include "GLWidget3D.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
 
 #ifndef M_PI
 #define M_PI	3.1415926535
@@ -17,10 +18,12 @@ ShadowMapping::ShadowMapping() {
  * @param width			シャドウマッピングの幅
  * @param height		シャドウマッピングの高さ
  */
-void ShadowMapping::initShadow(int programId, int width, int height) {
+void ShadowMapping::init(int programId, int width, int height) {
 	this->programId = programId;
 	this->width = width;
 	this->height = height;
+
+	glUseProgram(programId);
 			
 	// FBO作成
 	glGenFramebuffers(1, &fboDepth);
@@ -50,9 +53,6 @@ void ShadowMapping::initShadow(int programId, int width, int height) {
 
 	glActiveTexture(GL_TEXTURE0);
 		
-	// シェーダに、GL_TEXTURE6がシャドウマッピング用のデプスバッファであることを伝える
-	glUniform1i(glGetUniformLocation(programId, "shadowMap"), 6);
-
 	glBindFramebuffer(GL_FRAMEBUFFER,0);
 }
 
@@ -62,10 +62,12 @@ void ShadowMapping::initShadow(int programId, int width, int height) {
  * @param glWidget3D		GLWidget3Dクラス。このクラスのdrawScene(1)を呼び出してシーンを描画し、シャドウマップを生成する。
  * @param light_dir			光の進行方向
  */
-void ShadowMapping::makeShadowMap(GLWidget3D* glWidget3D, const glm::vec3& light_dir) {
+void ShadowMapping::update(GLWidget3D* glWidget3D, const glm::vec3& light_dir, const glm::mat4& light_mvpMatrix) {
 	int origWidth = glWidget3D->width();
 	int origHeigh = glWidget3D->height();
 				
+	glUseProgram(programId);
+
 	// レンダリング結果をFBOに保存するようにする
 	// この結果、デプスバッファはtextureDepthに保存される。
     glBindFramebuffer(GL_FRAMEBUFFER, fboDepth);
@@ -77,40 +79,30 @@ void ShadowMapping::makeShadowMap(GLWidget3D* glWidget3D, const glm::vec3& light
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(1.1f, 4.0f);
 
-	updateShadowMatrix(light_dir);
+	// シャドウマップ用のmodel/view/projection行列を設定
+	glUniformMatrix4fv(glGetUniformLocation(programId, "light_mvpMatrix"), 1, GL_FALSE, &light_mvpMatrix[0][0]);
+
+	// 光の方向を設定
+	//glUniform3f(glGetUniformLocation(programId, "lightDir"), light_dir.x, light_dir.y, light_dir.z);
 
 	// 色バッファには描画しない
 	glDrawBuffer(GL_NONE);
 
 	// デプスバッファをクリア
 	glClear(GL_DEPTH_BUFFER_BIT);
-	
-	//RENDER
-	glWidget3D->drawScene(1);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
 
+	//RENDER
+	glWidget3D->drawScene();
 	
 	// この時点で、textureDepthにデプス情報が格納されている
-
 	
 	glBindFramebuffer(GL_FRAMEBUFFER,0);
-
+	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDrawBuffer(GL_BACK);
 
 	// ビューポートを戻す
-	glViewport(0,0,origWidth,origHeigh);
-}
-
-/**
- * Model/View/Projection行列を更新し、シェーダに渡す。
- *
- * @param light_dir		光の進行方向
- */
-void ShadowMapping::updateShadowMatrix(const glm::vec3& light_dir) {
-	glm::mat4 light_pMatrix = glm::ortho<float>(-100, 100, -100, 100, 0.1, 5000);
-	glm::mat4 light_mvMatrix = glm::lookAt(-light_dir * 100.0f, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-	glm::mat4 light_mvpMatrix = light_pMatrix * light_mvMatrix;
-
-	// シェーダにmodel view projection行列を渡す
-	glUniformMatrix4fv(glGetUniformLocation(programId, "light_mvpMatrix"), 1, GL_FALSE, &light_mvpMatrix[0][0]);
-	glUniform3f(glGetUniformLocation(programId, "lightDir"), light_dir.x, light_dir.y, light_dir.z);
+	glViewport(0, 0, origWidth, origHeigh);
 }

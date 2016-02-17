@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>400</height>
+    <width>1101</width>
+    <height>853</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>600</width>
+     <width>1101</width>
      <height>21</height>
     </rect>
    </property>
@@ -27,17 +27,22 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionClearImage"/>
+    <addaction name="actionOpenImage"/>
+    <addaction name="actionSaveImage"/>
+    <addaction name="separator"/>
+    <addaction name="actionSave3DMesh"/>
+    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
-   <widget class="QMenu" name="menuL_System">
+   <widget class="QMenu" name="menuInverse">
     <property name="title">
-     <string>L-System</string>
+     <string>Inverse</string>
     </property>
-    <addaction name="actionRandomGeneration"/>
-    <addaction name="actionGreedyInverse"/>
+    <addaction name="actionMCTS"/>
    </widget>
    <addaction name="menuFile"/>
-   <addaction name="menuL_System"/>
+   <addaction name="menuInverse"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -53,14 +58,38 @@
     <string>Exit</string>
    </property>
   </action>
-  <action name="actionRandomGeneration">
+  <action name="actionOpenImage">
    <property name="text">
-    <string>Random Generation</string>
+    <string>Open Image</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
    </property>
   </action>
-  <action name="actionGreedyInverse">
+  <action name="actionSaveImage">
    <property name="text">
-    <string>Greedy Inverse</string>
+    <string>Save Image</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionSave3DMesh">
+   <property name="text">
+    <string>Save 3D Mesh</string>
+   </property>
+  </action>
+  <action name="actionClearImage">
+   <property name="text">
+    <string>Clear Image</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionMCTS">
+   <property name="text">
+    <string>MCTS</string>
    </property>
   </action>
  </widget>

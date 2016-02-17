@@ -50,6 +50,9 @@
 
 #include <vector>
 
+#include "opencv2/core/core.hpp"
+#include "opencv2/core/types_c.h"
+
 #if defined WIN32 || defined _WIN32
 #  ifndef WIN32
 #    define WIN32
@@ -59,15 +62,7 @@
 #  endif
 #endif
 
-#if defined WIN32 || defined WINCE
-#  ifndef _WIN32_WINNT         // This is needed for the declaration of TryEnterCriticalSection in winbase.h with Visual Studio 2005 (and older?)
-#    define _WIN32_WINNT 0x0400  // http://msdn.microsoft.com/en-us/library/ms686857(VS.85).aspx
-#  endif
-#  include <windows.h>
-#  undef small
-#  undef min
-#  undef max
-#else
+#if !defined WIN32 && !defined WINCE
 #  include <pthread.h>
 #endif
 
@@ -102,66 +97,94 @@ CV_INLINE IppiSize ippiSize(int width, int height)
     IppiSize size = { width, height };
     return size;
 }
+
+CV_INLINE IppiSize ippiSize(const cv::Size & _size)
+{
+    IppiSize size = { _size.width, _size.height };
+    return size;
+}
+
 #endif
 
-#if defined __SSE2__ || (defined _MSC_VER && _MSC_VER >= 1300)
+#ifndef IPPI_CALL
+#  define IPPI_CALL(func) CV_Assert((func) >= 0)
+#endif
+
+#if defined __SSE2__ || defined _M_X64  || (defined _M_IX86_FP && _M_IX86_FP >= 2)
 #  include "emmintrin.h"
 #  define CV_SSE 1
 #  define CV_SSE2 1
 #  if defined __SSE3__ || (defined _MSC_VER && _MSC_VER >= 1500)
 #    include "pmmintrin.h"
 #    define CV_SSE3 1
-#  else
-#    define CV_SSE3 0
 #  endif
-#  if defined __SSSE3__
+#  if defined __SSSE3__  || (defined _MSC_VER && _MSC_VER >= 1500)
 #    include "tmmintrin.h"
 #    define CV_SSSE3 1
-#  else
-#    define CV_SSSE3 0
 #  endif
 #  if defined __SSE4_1__ || (defined _MSC_VER && _MSC_VER >= 1500)
-#	 include <smmintrin.h>
-#	 define CV_SSE4_1 1
-#  else
-#    define CV_SSE4_1 0
+#    include <smmintrin.h>
+#    define CV_SSE4_1 1
 #  endif
 #  if defined __SSE4_2__ || (defined _MSC_VER && _MSC_VER >= 1500)
-#	 include <nmmintrin.h>
+#    include <nmmintrin.h>
 #    define CV_SSE4_2 1
-#  else
-#    define CV_SSE4_2 0
 #  endif
 #  if defined __AVX__ || (defined _MSC_FULL_VER && _MSC_FULL_VER >= 160040219)
-#	 include <immintrin.h>
+// MS Visual Studio 2010 (2012?) has no macro pre-defined to identify the use of /arch:AVX
+// See: http://connect.microsoft.com/VisualStudio/feedback/details/605858/arch-avx-should-define-a-predefined-macro-in-x64-and-set-a-unique-value-for-m-ix86-fp-in-win32
+#    include <immintrin.h>
 #    define CV_AVX 1
-#  else
-#    define CV_AVX 0
+#    if defined(_XCR_XFEATURE_ENABLED_MASK)
+#      define __xgetbv() _xgetbv(_XCR_XFEATURE_ENABLED_MASK)
+#    else
+#      define __xgetbv() 0
+#    endif
 #  endif
-#  else
-#  define CV_SSE 0
-#  define CV_SSE2 0
-#  define CV_SSE3 0
-#  define CV_SSSE3 0
-#  define CV_SSE4_1 0
-#  define CV_SSE4_2 0
-#  define CV_AVX 0
+#  if defined __AVX2__
+#    include <immintrin.h>
+#    define CV_AVX2 1
 #  endif
-
-#if defined ANDROID && defined __ARM_NEON__
-#  include "arm_neon.h"
-#  define CV_NEON 1
-
-#  define CPU_HAS_NEON_FEATURE (true)
-//TODO: make real check using stuff from "cpu-features.h"
-//((bool)android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON)
-#else
-#  define CV_NEON 0
-#  define CPU_HAS_NEON_FEATURE (false)
 #endif
 
-#ifndef IPPI_CALL
-#  define IPPI_CALL(func) CV_Assert((func) >= 0)
+
+#if (defined WIN32 || defined _WIN32) && defined(_M_ARM)
+# include <Intrin.h>
+# include "arm_neon.h"
+# define CV_NEON 1
+# define CPU_HAS_NEON_FEATURE (true)
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#  include <arm_neon.h>
+#  define CV_NEON 1
+#  define CPU_HAS_NEON_FEATURE (true)
+#endif
+
+#ifndef CV_SSE
+#  define CV_SSE 0
+#endif
+#ifndef CV_SSE2
+#  define CV_SSE2 0
+#endif
+#ifndef CV_SSE3
+#  define CV_SSE3 0
+#endif
+#ifndef CV_SSSE3
+#  define CV_SSSE3 0
+#endif
+#ifndef CV_SSE4_1
+#  define CV_SSE4_1 0
+#endif
+#ifndef CV_SSE4_2
+#  define CV_SSE4_2 0
+#endif
+#ifndef CV_AVX
+#  define CV_AVX 0
+#endif
+#ifndef CV_AVX2
+#  define CV_AVX2 0
+#endif
+#ifndef CV_NEON
+#  define CV_NEON 0
 #endif
 
 #ifdef HAVE_TBB
@@ -251,23 +274,27 @@ namespace cv
         body(range);
     }
 #endif
+
+    // Returns a static string if there is a parallel framework,
+    // NULL otherwise.
+    CV_EXPORTS const char* currentParallelFramework();
 } //namespace cv
 
 #define CV_INIT_ALGORITHM(classname, algname, memberinit) \
-    static Algorithm* create##classname() \
+    static ::cv::Algorithm* create##classname() \
     { \
         return new classname; \
     } \
     \
-    static AlgorithmInfo& classname##_info() \
+    static ::cv::AlgorithmInfo& classname##_info() \
     { \
-        static AlgorithmInfo classname##_info_var(algname, create##classname); \
+        static ::cv::AlgorithmInfo classname##_info_var(algname, create##classname); \
         return classname##_info_var; \
     } \
     \
-    static AlgorithmInfo& classname##_info_auto = classname##_info(); \
+    static ::cv::AlgorithmInfo& classname##_info_auto = classname##_info(); \
     \
-    AlgorithmInfo* classname::info() const \
+    ::cv::AlgorithmInfo* classname::info() const \
     { \
         static volatile bool initialized = false; \
         \
@@ -333,36 +360,12 @@ namespace cv
 *                                  Common declarations                                   *
 \****************************************************************************************/
 
-/* get alloca declaration */
-#ifdef __GNUC__
-#  undef alloca
-#  define alloca __builtin_alloca
-#  define CV_HAVE_ALLOCA 1
-#elif defined WIN32 || defined _WIN32 || \
-      defined WINCE || defined _MSC_VER || defined __BORLANDC__
-#  include <malloc.h>
-#  define CV_HAVE_ALLOCA 1
-#elif defined HAVE_ALLOCA_H
-#  include <alloca.h>
-#  define CV_HAVE_ALLOCA 1
-#elif defined HAVE_ALLOCA
-#  include <stdlib.h>
-#  define CV_HAVE_ALLOCA 1
-#else
-#  undef CV_HAVE_ALLOCA
-#endif
-
 #ifdef __GNUC__
 #  define CV_DECL_ALIGNED(x) __attribute__ ((aligned (x)))
 #elif defined _MSC_VER
 #  define CV_DECL_ALIGNED(x) __declspec(align(x))
 #else
 #  define CV_DECL_ALIGNED(x)
-#endif
-
-#if CV_HAVE_ALLOCA
-/* ! DO NOT make it an inline function */
-#  define cvStackAlloc(size) cvAlignPtr( alloca((size) + CV_MALLOC_ALIGN), CV_MALLOC_ALIGN )
 #endif
 
 #ifndef CV_IMPL
@@ -751,7 +754,9 @@ typedef struct CvBigFuncTable
     (tab).fn_2d[CV_64F] = (void*)FUNCNAME##_64f##FLAG
 
 #ifdef __cplusplus
-//! OpenGL extension table
+
+// < Deprecated
+
 class CV_EXPORTS CvOpenGlFuncTab
 {
 public:
@@ -777,11 +782,13 @@ CV_EXPORTS void icvSetOpenGlFuncTab(const CvOpenGlFuncTab* tab);
 
 CV_EXPORTS bool icvCheckGlError(const char* file, const int line, const char* func = "");
 
-#if defined(__GNUC__)
-    #define CV_CheckGlError() CV_DbgAssert( (::icvCheckGlError(__FILE__, __LINE__, __func__)) )
-#else
-    #define CV_CheckGlError() CV_DbgAssert( (::icvCheckGlError(__FILE__, __LINE__)) )
-#endif
+// >
+
+namespace cv { namespace ogl {
+CV_EXPORTS bool checkError(const char* file, const int line, const char* func = "");
+}}
+
+#define CV_CheckGlError() CV_DbgAssert( (cv::ogl::checkError(__FILE__, __LINE__, CV_Func)) )
 
 #endif //__cplusplus
 

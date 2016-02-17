@@ -1,7 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QtGui/QMainWindow>
+#include <QtWidgets/QMainWindow>
 #include "ui_MainWindow.h"
 #include "GLWidget3D.h"
 
@@ -13,12 +13,14 @@ private:
 	GLWidget3D* glWidget;
 
 public:
-	MainWindow(QWidget *parent = 0, Qt::WFlags flags = 0);
+	MainWindow(QWidget *parent = 0);
 
 public slots:
-	void onRandomGeneration();
-	void onGreedyInverse();
-
+	void onClearImage();
+	void onOpenImage();
+	void onSaveImage();
+	void onSave3DMesh();
+	void onMCTS();
 };
 
 #endif // MAINWINDOW_H

@@ -24,20 +24,17 @@
       <SourceControlFiles>False</SourceControlFiles>
     </Filter>
     <Filter Include="Generated Files\Debug">
-      <UniqueIdentifier>{190ca31c-7bb2-4dd3-86f3-1898710f5b29}</UniqueIdentifier>
+      <UniqueIdentifier>{6e02ac8d-403f-4573-b9d8-4c689af8b54a}</UniqueIdentifier>
       <Extensions>cpp;moc</Extensions>
       <SourceControlFiles>False</SourceControlFiles>
     </Filter>
     <Filter Include="Generated Files\Release">
-      <UniqueIdentifier>{5ac6ff0b-6687-4c44-8e3e-443579de1929}</UniqueIdentifier>
+      <UniqueIdentifier>{6d95f6eb-1281-4229-bc97-685f3e216da4}</UniqueIdentifier>
       <Extensions>cpp;moc</Extensions>
       <SourceControlFiles>False</SourceControlFiles>
     </Filter>
-    <Filter Include="Source Files\codebase">
-      <UniqueIdentifier>{55f47b69-3ab2-49f6-8e59-ffa4a66c122e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\shaders">
-      <UniqueIdentifier>{5f7cf848-8166-4442-95f6-ecb8b1bafbe4}</UniqueIdentifier>
+      <UniqueIdentifier>{2ab3285a-addf-4349-9fb9-7ef252633c1b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -56,25 +53,25 @@
     <ClCompile Include="GeneratedFiles\qrc_MainWindow.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="ParametricLSystem.cpp">
+    <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\codebase\MLUtils.cpp">
-      <Filter>Source Files\codebase</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\codebase\GLUtils.cpp">
-      <Filter>Source Files\codebase</Filter>
     </ClCompile>
     <ClCompile Include="GLWidget3D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\codebase\Shader.cpp">
-      <Filter>Source Files\codebase</Filter>
+    <ClCompile Include="RenderManager.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Camera.cpp">
+    <ClCompile Include="Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ShadowMapping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GLUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MCTS.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -93,36 +90,39 @@
     <ClInclude Include="GeneratedFiles\ui_MainWindow.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\codebase\MLUtils.h">
-      <Filter>Source Files\codebase</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\codebase\GLUtils.h">
-      <Filter>Source Files\codebase</Filter>
-    </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GLWidget3D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ParametricLSystem.h">
+    <ClInclude Include="RenderManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\codebase\Shader.h">
-      <Filter>Source Files\codebase</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\codebase\Vertex.h">
-      <Filter>Source Files\codebase</Filter>
+    <ClInclude Include="Shader.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ShadowMapping.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GLUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MCTS.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\shaders\fragment.glsl">
+    <None Include="shaders\fragment.glsl">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="..\shaders\vertex.glsl">
+    <None Include="shaders\geometry.glsl">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="shaders\vertex.glsl">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>
