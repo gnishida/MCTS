@@ -197,16 +197,17 @@ namespace mcts {
 	State MCTS::inverse(int maxDerivationSteps, int maxMCTSIterations) {
 		if (QDir("results").exists()) {
 			QDir("results").removeRecursively();
-			QDir().mkdir("results");
 		}
-		
+
 		State state(boost::shared_ptr<Nonterminal>(new Nonterminal("X", 0, 3.0f)));
 
 		for (int iter = 0; iter < maxDerivationSteps; ++iter) {
 			state = mcts(state, maxMCTSIterations);
 
 			////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
-			QString filename = QString("results/result_%.png").arg(iter);
+			if (!QDir("results/").exists())	QDir().mkpath("results/");
+
+			QString filename = QString("results/result_%1.png").arg(iter);
 			QImage image;
 			render(state.derivationTree, image);
 			image.save(filename);
@@ -280,9 +281,26 @@ namespace mcts {
 	void MCTS::backpropage(const boost::shared_ptr<MCTSTreeNode>& childNode, float value) {
 		boost::shared_ptr<MCTSTreeNode> node = childNode;
 
+		// リーフノードなら、スコアを確定する
+		if (node->unexpandedActions.size() == 0 && node->children.size() == 0) {
+			node->valueFixed = true;
+		}
+
 		while (node != NULL) {
 			node->visits++;
 			node->addValue(value);
+
+			// 子ノードが全て展開済みで、且つ、スコア確定済みなら、このノードのスコアも確定とする
+			if (node->unexpandedActions.size() == 0) {
+				bool fixed = true;
+				for (int c = 0; c < node->children.size(); ++c) {
+					if (!node->children[c]->valueFixed) {
+						fixed = false;
+						break;
+					}
+				}
+				node->valueFixed = fixed;
+			}
 
 			node = node->parent;
 		}

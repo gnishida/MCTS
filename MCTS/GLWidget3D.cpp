@@ -304,7 +304,7 @@ void GLWidget3D::runMCTS() {
 	cv::Mat sketchMat(swapped.height(), swapped.width(), CV_8UC3, const_cast<uchar*>(swapped.bits()), swapped.bytesPerLine());
 
 	mcts::MCTS mcts(sketchMat, this);
-	mcts.inverse(10, 10);
+	mcts.inverse(10, 100);
 }
 
 void GLWidget3D::keyPressEvent(QKeyEvent *e) {
