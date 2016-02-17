@@ -304,7 +304,7 @@ void GLWidget3D::runMCTS() {
 	cv::Mat sketchMat(swapped.height(), swapped.width(), CV_8UC3, const_cast<uchar*>(swapped.bits()), swapped.bytesPerLine());
 
 	mcts::MCTS mcts(sketchMat, this);
-	mcts.inverse(10, 3);
+	mcts.inverse(10, 10);
 }
 
 void GLWidget3D::keyPressEvent(QKeyEvent *e) {
@@ -416,9 +416,9 @@ void GLWidget3D::initializeGL() {
 	glDisable(GL_TEXTURE_2D_ARRAY);
 
 	////////////////////////////////
-	renderManager.init("", "", "", true, 8192);
+	renderManager.init(true, 8192);
 	renderManager.resize(this->width(), this->height());
-	renderManager.renderingMode = RenderManager::RENDERING_MODE_LINE;
+	renderManager.renderingMode = RenderManager::RENDERING_MODE_BASIC;
 
 	glUniform1i(glGetUniformLocation(renderManager.programs["ssao"], "tex0"), 0);//tex0: 0
 
@@ -428,16 +428,14 @@ void GLWidget3D::initializeGL() {
 	camera.xrot = 0.0f;
 	camera.yrot = 0.0f;
 	camera.zrot = 0.0f;
-	camera.pos = glm::vec3(0, 0, 30);
-
-
+	camera.pos = glm::vec3(0, 4, 12);
+	
 	clearImage();
 
-	/*
+	// なぜか、ダミーでgeometryを追加しておかないと、sketchが表示されないので、
 	std::vector<Vertex> vertices;
-	glutils::drawQuad(10, 10, glm::vec4(1, 0, 0, 1), glm::mat4(), vertices);
+	glutils::drawQuad(0, 0, glm::vec4(1, 1, 1, 1), glm::mat4(), vertices);
 	renderManager.addObject("test", "", vertices, true);
-	*/
 }
 
 /**

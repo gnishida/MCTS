@@ -80,7 +80,7 @@ RenderManager::~RenderManager() {
 	glDeleteVertexArrays(1,&secondPassVAO);
 }
 
-void RenderManager::init(const std::string& vertex_file, const std::string& geometry_file, const std::string& fragment_file, bool useShadow, int shadowMapSize) {
+void RenderManager::init(bool useShadow, int shadowMapSize) {
 	this->useShadow = useShadow;
 	this->softShadow = true;
 	renderingMode = RENDERING_MODE_BASIC;

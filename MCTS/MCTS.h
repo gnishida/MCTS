@@ -8,6 +8,7 @@
 #include <list>
 #include <map>
 #include "Vertex.h"
+#include <QImage>
 
 class GLWidget3D;
 class RenderManager;
@@ -64,9 +65,6 @@ namespace mcts {
 		int numParams();
 	};
 
-	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue, int maxLevel);
-	void applyRule(DerivationTree& derivationTree, const boost::shared_ptr<Nonterminal>& node, int action, std::list<boost::shared_ptr<Nonterminal> >& queue);
-
 	class State {
 	public:
 		DerivationTree derivationTree;
@@ -115,7 +113,12 @@ namespace mcts {
 		float simulate(const boost::shared_ptr<MCTSTreeNode>& childNode);
 		void backpropage(const boost::shared_ptr<MCTSTreeNode>& childNode, float value);
 		float evaluate(const DerivationTree& derivationTree);
-		void generateGeometry(RenderManager* renderManager, glm::mat4& modelMat, float length, float width, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices);
+		void render(const DerivationTree& derivationTree, QImage& image);
+		void generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, float length, float width, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices);
 	};
+
+	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue, int maxLevel);
+	void applyRule(DerivationTree& derivationTree, const boost::shared_ptr<Nonterminal>& node, int action, std::list<boost::shared_ptr<Nonterminal> >& queue);
+	float similarity(const cv::Mat& distMap, const cv::Mat& targetDistMap, float alpha, float beta);
 
 }

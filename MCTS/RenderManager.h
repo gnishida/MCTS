@@ -69,7 +69,7 @@ public:
 	RenderManager();
 	~RenderManager();
 
-	void init(const std::string& vertex_file, const std::string& geometry_file, const std::string& fragment_file, bool useShadow, int shadowMapSize = 4096);
+	void init(bool useShadow, int shadowMapSize = 4096);
 	
 	// ssao
 	void resize(int width,int height);
