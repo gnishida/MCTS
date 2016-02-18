@@ -2,14 +2,15 @@
 #include "GLWidget3D.h"
 #include "GLUtils.h"
 #include <QDir>
+#include <QTextStream>
 
 namespace mcts {
-	const double PARAM_EXPLORATION = 0.3;
+	const double PARAM_EXPLORATION = 1.0;// 0.3;
 	const double PARAM_EXPLORATION_VARIANCE = 0.1;
 	const float M_PI = 3.141592653f;
-	const float TREE_INITIAL_SEGMENT_LENGTH = 0.5f;
+	const float TREE_INITIAL_SEGMENT_LENGTH = 3.0f;// 0.5f;
 	const float TREE_INITIAL_SEGMENT_WIDTH = 0.3f;
-	const int MAX_SEGMENT_LEVEL = 10;
+	const int MAX_SEGMENT_LEVEL = 3;// 10;
 
 	Nonterminal::Nonterminal(const std::string& name, int level, float segmentLength, float angle, bool terminal) {
 		this->name = name;
@@ -125,15 +126,9 @@ namespace mcts {
 			// スコアが確定済みの子ノードは探索対象外とする
 			if (children[i]->valueFixed) continue;
 
-			double uct;
-			if (children[i]->visits == 0) {
-				uct = 10000 + rand() % 1000;
-			}
-			else {
-				uct = children[i]->bestValue
-					+ PARAM_EXPLORATION * sqrt(2 * log((double)visits) / (double)children[i]->visits)
-					+ PARAM_EXPLORATION_VARIANCE * sqrt(children[i]->varianceValues + 0.0 / (double)children[i]->visits);
-			}
+			double uct = children[i]->bestValue
+				+ PARAM_EXPLORATION * sqrt(2 * log((double)visits) / ((double)children[i]->visits + 1));
+				//+ PARAM_EXPLORATION_VARIANCE * sqrt(children[i]->varianceValues + 0.0 / (double)children[i]->visits);
 
 			if (uct > max_uct) {
 				max_uct = uct;
@@ -240,6 +235,19 @@ namespace mcts {
 			backpropage(childNode, value);
 		}
 
+		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
+		if (!QDir("results/").exists())	QDir().mkpath("results/");
+		QFile file("results/visits.txt");
+		file.open(QIODevice::Append);
+		QTextStream out(&file);
+		for (int i = 0; i < rootNode->children.size(); ++i) {
+			if (i > 0) out << ",";
+			out << rootNode->children[i]->selectedAction << "(#visits: " << rootNode->children[i]->visits << ", #val: " << rootNode->children[i]->bestValue << ")";
+		}
+		out << "\n";
+		file.close();
+		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
+
 		return rootNode->bestChild()->state;
 	}
 
@@ -269,6 +277,7 @@ namespace mcts {
 			child_state.applyAction(action);
 
 			boost::shared_ptr<MCTSTreeNode> child_node = boost::shared_ptr<MCTSTreeNode>(new MCTSTreeNode(child_state));
+			child_node->selectedAction = action;
 			node->children.push_back(child_node);
 			child_node->parent = node;
 

@@ -89,6 +89,7 @@ namespace mcts {
 		boost::shared_ptr<MCTSTreeNode> parent;
 		std::vector<boost::shared_ptr<MCTSTreeNode> > children;
 		std::vector<int> unexpandedActions;
+		int selectedAction;
 
 	public:
 		MCTSTreeNode(const State& state);
