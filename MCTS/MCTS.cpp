@@ -7,17 +7,21 @@ namespace mcts {
 	const double PARAM_EXPLORATION = 0.3;
 	const double PARAM_EXPLORATION_VARIANCE = 0.1;
 	const float M_PI = 3.141592653f;
+	const float TREE_INITIAL_SEGMENT_LENGTH = 0.5f;
+	const float TREE_INITIAL_SEGMENT_WIDTH = 0.3f;
+	const int MAX_SEGMENT_LEVEL = 10;
 
-	Nonterminal::Nonterminal(const std::string& name, int level, float segmentLength, float angle, bool terminated) {
+	Nonterminal::Nonterminal(const std::string& name, int level, float segmentLength, float angle, bool terminal) {
 		this->name = name;
 		this->level = level;
 		this->segmentLength = segmentLength;
+		this->segmentWidth = TREE_INITIAL_SEGMENT_WIDTH;
 		this->angle = angle;
-		this->terminated = terminated;
+		this->terminal = terminal;
 	}
 
 	boost::shared_ptr<Nonterminal> Nonterminal::clone() {
-		boost::shared_ptr<Nonterminal> newNonterminal = boost::shared_ptr<Nonterminal>(new Nonterminal(name, level, segmentLength, angle, terminated));
+		boost::shared_ptr<Nonterminal> newNonterminal = boost::shared_ptr<Nonterminal>(new Nonterminal(name, level, segmentLength, angle, terminal));
 		for (int i = 0; i < children.size(); ++i) {
 			newNonterminal->children.push_back(children[i]->clone());
 		}
@@ -60,7 +64,7 @@ namespace mcts {
 			boost::shared_ptr<Nonterminal> node = queue.front();
 			queue.pop_front();
 
-			if (!node->terminated) {
+			if (!node->terminal) {
 				newState.queue.push_back(node);
 			}
 
@@ -78,7 +82,7 @@ namespace mcts {
 		boost::shared_ptr<Nonterminal> node = queue.front();
 		queue.pop_front();
 
-		if (node->terminated) return false;
+		if (node->terminal) return false;
 
 		applyRule(derivationTree, node, action, queue);
 
@@ -101,12 +105,12 @@ namespace mcts {
 				}
 			}
 			else if (state.queue.front()->name == "/") {
-				for (int i = 0; i < 5; ++i) {
+				for (int i = 0; i < 7; ++i) {
 					this->unexpandedActions.push_back(i);
 				}
 			}
 			else if (state.queue.front()->name == "\\") {
-				for (int i = 0; i < 6; ++i) {
+				for (int i = 0; i < 14; ++i) {
 					this->unexpandedActions.push_back(i);
 				}
 			}
@@ -188,7 +192,7 @@ namespace mcts {
 		cv::distanceTransform(grayImage, targetDistMap, CV_DIST_L2, 3);
 
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
-		cv::imwrite("targetDistMap.png", targetDistMap);
+		//cv::imwrite("targetDistMap.png", targetDistMap);
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
 
 		targetDistMap.convertTo(targetDistMap, CV_32F);
@@ -199,7 +203,7 @@ namespace mcts {
 			QDir("results").removeRecursively();
 		}
 
-		State state(boost::shared_ptr<Nonterminal>(new Nonterminal("X", 0, 3.0f)));
+		State state(boost::shared_ptr<Nonterminal>(new Nonterminal("X", 0, TREE_INITIAL_SEGMENT_LENGTH)));
 
 		for (int iter = 0; iter < maxDerivationSteps; ++iter) {
 			state = mcts(state, maxMCTSIterations);
@@ -274,7 +278,7 @@ namespace mcts {
 	
 	float MCTS::simulate(const boost::shared_ptr<MCTSTreeNode>& childNode) {
 		State state = childNode->state.clone();
-		randomDerivation(state.derivationTree, state.queue, 3);
+		randomDerivation(state.derivationTree, state.queue, MAX_SEGMENT_LEVEL);
 		return evaluate(state.derivationTree);
 	}
 
@@ -310,7 +314,7 @@ namespace mcts {
 		QImage image;
 		render(derivationTree.root, image);
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
-		image.save("output.png");
+		//image.save("output.png");
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
 
 		cv::Mat sourceImage(image.height(), image.width(), CV_8UC4, image.bits(), image.bytesPerLine());
@@ -322,40 +326,46 @@ namespace mcts {
 		cv::Mat distMap;
 		cv::distanceTransform(grayImage, distMap, CV_DIST_L2, 3);
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
-		cv::imwrite("distMap.png", distMap);
+		//cv::imwrite("distMap.png", distMap);
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
 		distMap.convertTo(distMap, CV_32F);
 
 		// compute the squared difference
-		return similarity(distMap, targetDistMap, 10000.0f, 10000.0f);
+		return similarity(distMap, targetDistMap, 10000.0f, 5000.0f);
 	}
 
 	void MCTS::render(const DerivationTree& derivationTree, QImage& image) {
 		glWidget->renderManager.removeObjects();
 		std::vector<Vertex> vertices;
-		generateGeometry(&glWidget->renderManager, glm::mat4(), 3.0f, 0.3f, derivationTree.root, vertices);
+		generateGeometry(&glWidget->renderManager, glm::mat4(), derivationTree.root, vertices);
 		glWidget->renderManager.addObject("tree", "", vertices, true);
 		glWidget->render();
 		
 		image = glWidget->grabFrameBuffer();
 	}
 
-	void MCTS::generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, float length, float width, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices) {
+	void MCTS::generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices) {
 		glm::mat4 mat;
 
 		if (node->name == "F") {
-			glutils::drawQuad(width, length, glm::vec4(0, 0, 0, 1), glm::translate(modelMat, glm::vec3(0, length * 0.5, 0)), vertices);
-			mat = glm::translate(modelMat, glm::vec3(0, length, 0));
+			glutils::drawQuad(node->segmentWidth, node->segmentLength, glm::vec4(0, 0, 0, 1), glm::translate(modelMat, glm::vec3(0, node->segmentLength * 0.5, 0)), vertices);
+			mat = glm::translate(modelMat, glm::vec3(0, node->segmentLength, 0));
+		}
+		else if (node->name == "X") {
+			glutils::drawQuad(node->segmentWidth, node->segmentLength, glm::vec4(0.5, 0.5, 0.5, 1), glm::translate(modelMat, glm::vec3(0, node->segmentLength * 0.5, 0)), vertices);
+			mat = glm::translate(modelMat, glm::vec3(0, node->segmentLength, 0));
 		}
 		else if (node->name == "/") {
+			if (!node->terminal) return;
 			mat = glm::rotate(modelMat, node->angle / 180.0f * M_PI, glm::vec3(0, 0, 1));
 		}
 		else if (node->name == "\\") {
+			if (!node->terminal) return;
 			mat = glm::rotate(modelMat, node->angle / 180.0f * M_PI, glm::vec3(0, 0, 1));
 		}
 		
 		for (int i = 0; i < node->children.size(); ++i) {
-			generateGeometry(renderManager, mat, length, width, node->children[i], vertices);
+			generateGeometry(renderManager, mat, node->children[i], vertices);
 		}
 	}
 
@@ -364,12 +374,12 @@ namespace mcts {
 			boost::shared_ptr<Nonterminal> node = queue.front();
 			queue.pop_front();
 
-			if (node->terminated) continue;
+			if (node->terminal) continue;
 
 			if (node->name == "X") {
 				if (node->level >= maxLevel - 1) {
 					node->name = "F";
-					node->terminated = true;
+					node->terminal = true;
 					continue;
 				}
 
@@ -377,12 +387,12 @@ namespace mcts {
 				applyRule(derivationTree, node, action, queue);
 			}
 			else if (node->name == "/") {
-				int action = rand() % 5;
+				int action = rand() % 7;
 				applyRule(derivationTree, node, action, queue);
 
 			}
 			else if (node->name == "\\") {
-				int action = rand() % 6;
+				int action = rand() % 14;
 				applyRule(derivationTree, node, action, queue);
 			}
 		}
@@ -392,11 +402,11 @@ namespace mcts {
 		if (node->name == "X") {
 			if (action == 0) {
 				node->name = "F";
-				node->terminated = true;
+				node->terminal = true;
 			}
 			else if (action == 1) {
 				node->name = "F";
-				node->terminated = true;
+				node->terminal = true;
 
 				boost::shared_ptr<Nonterminal> child = boost::shared_ptr<Nonterminal>(new Nonterminal("/", node->level + 1, node->segmentLength));
 				node->children.push_back(child);
@@ -408,7 +418,7 @@ namespace mcts {
 			}
 			else if (action == 2) {
 				node->name = "F";
-				node->terminated = true;
+				node->terminal = true;
 
 				boost::shared_ptr<Nonterminal> child1 = boost::shared_ptr<Nonterminal>(new Nonterminal("/", node->level + 1, node->segmentLength));
 				node->children.push_back(child1);
@@ -428,12 +438,12 @@ namespace mcts {
 			}
 		}
 		else if (node->name == "/") {
-			node->angle = action * 10 - 20;
-			node->terminated = true;
+			node->angle = action * 10 - 30;
+			node->terminal = true;
 		}
 		else if (node->name == "\\") {
-			node->angle = action < 3 ? action * 30 - 90 : action * 30 - 60;
-			node->terminated = true;
+			node->angle = action < 7 ? action * 10 - 90 : action * 10 - 40;
+			node->terminal = true;
 		}
 	}
 

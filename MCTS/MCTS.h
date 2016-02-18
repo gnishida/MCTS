@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <opencv2/opencv.hpp>
 #include <boost/shared_ptr.hpp>
@@ -20,12 +20,13 @@ namespace mcts {
 		std::string name;
 		int level;
 		float segmentLength;
+		float segmentWidth;
 		float angle;
 		std::vector<boost::shared_ptr<Nonterminal> > children;
-		bool terminated;
+		bool terminal; // trueなら、ruleは適用しない。もう確定ということ。
 
 	public:
-		Nonterminal(const std::string& name, int level, float segmentLength, float angle = 0.0f, bool terminated = false);
+		Nonterminal(const std::string& name, int level, float segmentLength, float angle = 0.0f, bool terminal = false);
 		boost::shared_ptr<Nonterminal> clone();
 	};
 
@@ -114,7 +115,7 @@ namespace mcts {
 		void backpropage(const boost::shared_ptr<MCTSTreeNode>& childNode, float value);
 		float evaluate(const DerivationTree& derivationTree);
 		void render(const DerivationTree& derivationTree, QImage& image);
-		void generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, float length, float width, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices);
+		void generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices);
 	};
 
 	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue, int maxLevel);

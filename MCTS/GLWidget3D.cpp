@@ -12,6 +12,7 @@
 #include <QTextStream>
 #include "MCTS.h"
 #include "GLUtils.h"
+#include <time.h>
 
 GLWidget3D::GLWidget3D(MainWindow* mainWin) : QGLWidget(QGLFormat(QGL::SampleBuffers), (QWidget*)mainWin) {
 	this->mainWin = mainWin;
@@ -300,11 +301,16 @@ void GLWidget3D::drawLine(const QPoint& startPoint, const QPoint& endPoint) {
 }
 
 void GLWidget3D::runMCTS() {
-	QImage   swapped = sketch.rgbSwapped();
+	time_t start = clock();
+
+	QImage swapped = sketch.rgbSwapped();
 	cv::Mat sketchMat(swapped.height(), swapped.width(), CV_8UC3, const_cast<uchar*>(swapped.bits()), swapped.bytesPerLine());
 
 	mcts::MCTS mcts(sketchMat, this);
-	mcts.inverse(10, 100);
+	mcts.inverse(200, 2000);
+
+	time_t end = clock();
+	std::cout << "Elapsed time: " << (double)(end - start) / CLOCKS_PER_SEC << "sec" << std::endl;
 }
 
 void GLWidget3D::keyPressEvent(QKeyEvent *e) {
