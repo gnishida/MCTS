@@ -5,12 +5,14 @@
 #include <QTextStream>
 
 namespace mcts {
-	const double PARAM_EXPLORATION = 1.0;// 0.3;
+	const double PARAM_EXPLORATION = 1.0;
 	const double PARAM_EXPLORATION_VARIANCE = 0.1;
 	const float M_PI = 3.141592653f;
-	const float TREE_INITIAL_SEGMENT_LENGTH = 3.0f;// 0.5f;
+	const float TREE_INITIAL_SEGMENT_LENGTH = 0.5f;
 	const float TREE_INITIAL_SEGMENT_WIDTH = 0.3f;
-	const int MAX_SEGMENT_LEVEL = 3;// 10;
+	const int MAX_SEGMENT_LEVEL = 10;
+	const float SIMILARITY_METRICS_ALPHA = 10000.0f;
+	const float SIMILARITY_METRICS_BETA = 1000.0f;
 
 	Nonterminal::Nonterminal(const std::string& name, int level, float segmentLength, float angle, bool terminal) {
 		this->name = name;
@@ -93,6 +95,7 @@ namespace mcts {
 	MCTSTreeNode::MCTSTreeNode(const State& state) {
 		visits = 0;
 		bestValue = 0;
+		meanValue = 0;
 		valueFixed = false;
 		varianceValues = 0;
 		this->state = state;
@@ -101,8 +104,14 @@ namespace mcts {
 		if (!state.queue.empty()) {
 			// queueが空でない場合、先頭のnon-terminalに基づいて、unexpandedActionsを設定する
 			if (state.queue.front()->name == "X") {
-				for (int i = 0; i < 3; ++i) {
-					this->unexpandedActions.push_back(i);
+				// まだ最大レベルに達していない場合のみ、延伸・枝分かれを許可する
+				if (state.queue.front()->level < MAX_SEGMENT_LEVEL - 1) {
+					for (int i = 0; i < 3; ++i) {
+						this->unexpandedActions.push_back(i);
+					}
+				}
+				else {
+					this->unexpandedActions.push_back(0);
 				}
 			}
 			else if (state.queue.front()->name == "/") {
@@ -167,7 +176,8 @@ namespace mcts {
 			total_val2 = values[i] * values[i];
 		}
 
-		varianceValues = total_val2 / values.size() - (total_val / values.size()) * (total_val / values.size());
+		meanValue = total_val / values.size();
+		varianceValues = total_val2 / values.size() - meanValue * meanValue;
 	}
 
 	int MCTSTreeNode::randomlySelectAction() {
@@ -256,7 +266,9 @@ namespace mcts {
 
 		// 探索木のリーフノードまで探索
 		while (node->unexpandedActions.size() == 0 && node->children.size() > 0) {
-			node = node->UCTSelectChild();
+			boost::shared_ptr<MCTSTreeNode> childNode = node->UCTSelectChild();
+			if (childNode == NULL) break;
+			node = childNode;
 		}
 
 		return node;
@@ -340,7 +352,7 @@ namespace mcts {
 		distMap.convertTo(distMap, CV_32F);
 
 		// compute the squared difference
-		return similarity(distMap, targetDistMap, 10000.0f, 5000.0f);
+		return similarity(distMap, targetDistMap, SIMILARITY_METRICS_ALPHA, SIMILARITY_METRICS_BETA);
 	}
 
 	void MCTS::render(const DerivationTree& derivationTree, QImage& image) {

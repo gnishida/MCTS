@@ -82,6 +82,7 @@ namespace mcts {
 	public:
 		int visits;
 		float bestValue;
+		float meanValue;
 		bool valueFixed;
 		std::vector<float> values;
 		float varianceValues;
