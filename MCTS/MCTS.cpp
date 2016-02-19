@@ -8,17 +8,18 @@ namespace mcts {
 	const double PARAM_EXPLORATION = 1.0;
 	const double PARAM_EXPLORATION_VARIANCE = 0.1;
 	const float M_PI = 3.141592653f;
-	const float TREE_INITIAL_SEGMENT_LENGTH = 0.5f;
-	const float TREE_INITIAL_SEGMENT_WIDTH = 0.3f;
-	const int MAX_SEGMENT_LEVEL = 10;
+	const float INITIAL_SEGMENT_LENGTH = 0.5f;
+	const float INITIAL_SEGMENT_WIDTH = 0.3f;
+	const int MAX_SEGMENT_LEVEL = 20;
 	const float SIMILARITY_METRICS_ALPHA = 10000.0f;
-	const float SIMILARITY_METRICS_BETA = 1000.0f;
+	const float SIMILARITY_METRICS_BETA = 5000.0f;
+	const int BASE_PART = 0;
 
 	Nonterminal::Nonterminal(const std::string& name, int level, float segmentLength, float angle, bool terminal) {
 		this->name = name;
 		this->level = level;
 		this->segmentLength = segmentLength;
-		this->segmentWidth = TREE_INITIAL_SEGMENT_WIDTH;
+		this->segmentWidth = INITIAL_SEGMENT_WIDTH;
 		this->angle = angle;
 		this->terminal = terminal;
 	}
@@ -106,8 +107,16 @@ namespace mcts {
 			if (state.queue.front()->name == "X") {
 				// まだ最大レベルに達していない場合のみ、延伸・枝分かれを許可する
 				if (state.queue.front()->level < MAX_SEGMENT_LEVEL - 1) {
-					for (int i = 0; i < 3; ++i) {
-						this->unexpandedActions.push_back(i);
+					// 根元は、枝分かれしない
+					if (state.queue.front()->level < BASE_PART) {
+						for (int i = 0; i < 2; ++i) {
+							this->unexpandedActions.push_back(i);
+						}
+					}
+					else {
+						for (int i = 0; i < 3; ++i) {
+							this->unexpandedActions.push_back(i);
+						}
 					}
 				}
 				else {
@@ -208,7 +217,7 @@ namespace mcts {
 			QDir("results").removeRecursively();
 		}
 
-		State state(boost::shared_ptr<Nonterminal>(new Nonterminal("X", 0, TREE_INITIAL_SEGMENT_LENGTH)));
+		State state(boost::shared_ptr<Nonterminal>(new Nonterminal("X", 0, INITIAL_SEGMENT_LENGTH)));
 
 		for (int iter = 0; iter < maxDerivationSteps; ++iter) {
 			state = mcts(state, maxMCTSIterations);
@@ -404,8 +413,14 @@ namespace mcts {
 					continue;
 				}
 
-				int action = rand() % 3;
-				applyRule(derivationTree, node, action, queue);
+				if (node->level < BASE_PART) { // 根元は枝分かれさせない
+					int action = rand() % 2;
+					applyRule(derivationTree, node, action, queue);
+				}
+				else {
+					int action = rand() % 3;
+					applyRule(derivationTree, node, action, queue);
+				}
 			}
 			else if (node->name == "/") {
 				int action = rand() % 7;
@@ -433,7 +448,7 @@ namespace mcts {
 				node->children.push_back(child);
 				queue.push_back(child);
 
-				boost::shared_ptr<Nonterminal> grandchild = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, node->segmentLength));
+				boost::shared_ptr<Nonterminal> grandchild = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, INITIAL_SEGMENT_LENGTH));
 				child->children.push_back(grandchild);
 				queue.push_back(grandchild);
 			}
@@ -445,7 +460,7 @@ namespace mcts {
 				node->children.push_back(child1);
 				queue.push_back(child1);
 
-				boost::shared_ptr<Nonterminal> grandchild1 = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, node->segmentLength));
+				boost::shared_ptr<Nonterminal> grandchild1 = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, INITIAL_SEGMENT_LENGTH));
 				child1->children.push_back(grandchild1);
 				queue.push_back(grandchild1);
 
@@ -453,7 +468,7 @@ namespace mcts {
 				node->children.push_back(child2);
 				queue.push_back(child2);
 
-				boost::shared_ptr<Nonterminal> grandchild2 = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, node->segmentLength));
+				boost::shared_ptr<Nonterminal> grandchild2 = boost::shared_ptr<Nonterminal>(new Nonterminal("X", node->level + 1, INITIAL_SEGMENT_LENGTH));
 				child2->children.push_back(grandchild2);
 				queue.push_back(grandchild2);
 			}
