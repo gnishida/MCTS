@@ -19,6 +19,7 @@ namespace mcts {
 	public:
 		std::string name;
 		int level;
+		int dist;
 		float segmentLength;
 		float segmentWidth;
 		float angle;
@@ -26,7 +27,7 @@ namespace mcts {
 		bool terminal; // trueなら、ruleは適用しない。もう確定ということ。
 
 	public:
-		Nonterminal(const std::string& name, int level, float segmentLength, float angle = 0.0f, bool terminal = false);
+		Nonterminal(const std::string& name, int level, int dist, float segmentLength, float angle = 0.0f, bool terminal = false);
 		boost::shared_ptr<Nonterminal> clone();
 	};
 
@@ -38,32 +39,6 @@ namespace mcts {
 		DerivationTree();
 		DerivationTree(const boost::shared_ptr<Nonterminal>& root);
 		DerivationTree clone() const;
-	};
-
-	class Rule {
-	protected:
-		Rule();
-		
-	public:
-		virtual void apply(const boost::shared_ptr<Nonterminal>& nonterminal, const std::vector<float>& params, std::list<boost::shared_ptr<Nonterminal> >& queue);
-		virtual int numParams();
-	};
-
-	class TreeStopRule {
-		void apply(const boost::shared_ptr<Nonterminal>& nonterminal, const std::vector<float>& params, std::list<boost::shared_ptr<Nonterminal> >& queue);
-		int numParams();
-	};
-
-	class TreeExtendingRule {
-	public:
-		void apply(const boost::shared_ptr<Nonterminal>& nonterminal, const std::vector<float>& params, std::list<boost::shared_ptr<Nonterminal> >& queue);
-		int numParams();
-	};
-
-	class TreeBranchingRule {
-	public:
-		void apply(const boost::shared_ptr<Nonterminal>& nonterminal, const std::vector<float>& params, std::list<boost::shared_ptr<Nonterminal> >& queue);
-		int numParams();
 	};
 
 	class State {
@@ -110,6 +85,7 @@ namespace mcts {
 		MCTS(const cv::Mat& target, GLWidget3D* glWidget);
 
 		State inverse(int maxDerivationSteps, int maxMCTSIterations);
+		void randomGeneration(RenderManager* renderManager);
 		State mcts(const State& state, int maxMCTSIterations);
 		boost::shared_ptr<MCTSTreeNode> select(const boost::shared_ptr<MCTSTreeNode>& rootNode);
 		boost::shared_ptr<MCTSTreeNode> expand(const boost::shared_ptr<MCTSTreeNode>& leafNode);
@@ -120,7 +96,8 @@ namespace mcts {
 		void generateGeometry(RenderManager* renderManager, const glm::mat4& modelMat, const boost::shared_ptr<Nonterminal>& node, std::vector<Vertex>& vertices);
 	};
 
-	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue, int maxLevel);
+	std::vector<int> actions(const boost::shared_ptr<Nonterminal>& nonterminal);
+	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue);
 	void applyRule(DerivationTree& derivationTree, const boost::shared_ptr<Nonterminal>& node, int action, std::list<boost::shared_ptr<Nonterminal> >& queue);
 	float similarity(const cv::Mat& distMap, const cv::Mat& targetDistMap, float alpha, float beta);
 

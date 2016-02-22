@@ -21,6 +21,7 @@ public slots:
 	void onSaveImage();
 	void onSave3DMesh();
 	void onMCTS();
+	void onRandomGeneration();
 };
 
 #endif // MAINWINDOW_H

@@ -39,6 +39,7 @@ public:
 	void save3DMesh(const QString& filename);
 	void drawLine(const QPoint& startPoint, const QPoint& endPoint);
 	void runMCTS();
+	void randomGeneration();
 
 	void keyPressEvent(QKeyEvent* e);
 	void keyReleaseEvent(QKeyEvent* e);

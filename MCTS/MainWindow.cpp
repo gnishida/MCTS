@@ -10,6 +10,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 	connect(ui.actionSaveImage, SIGNAL(triggered()), this, SLOT(onSaveImage()));
 	connect(ui.actionSave3DMesh, SIGNAL(triggered()), this, SLOT(onSave3DMesh()));
 	connect(ui.actionMCTS, SIGNAL(triggered()), this, SLOT(onMCTS()));
+	connect(ui.actionRandomGeneration, SIGNAL(triggered()), this, SLOT(onRandomGeneration()));
 
 	glWidget = new GLWidget3D(this);
 	setCentralWidget(glWidget);
@@ -43,4 +44,8 @@ void MainWindow::onSave3DMesh() {
 
 void MainWindow::onMCTS() {
 	glWidget->runMCTS();
+}
+
+void MainWindow::onRandomGeneration() {
+	glWidget->randomGeneration();
 }

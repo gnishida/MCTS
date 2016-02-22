@@ -313,6 +313,15 @@ void GLWidget3D::runMCTS() {
 	std::cout << "Elapsed time: " << (double)(end - start) / CLOCKS_PER_SEC << "sec" << std::endl;
 }
 
+void GLWidget3D::randomGeneration() {
+	QImage swapped = sketch.rgbSwapped();
+	cv::Mat sketchMat(swapped.height(), swapped.width(), CV_8UC3, const_cast<uchar*>(swapped.bits()), swapped.bytesPerLine());
+
+	mcts::MCTS mcts(sketchMat, this);
+	mcts.randomGeneration(&renderManager);
+	update();
+}
+
 void GLWidget3D::keyPressEvent(QKeyEvent *e) {
 	ctrlPressed = false;
 	shiftPressed = false;

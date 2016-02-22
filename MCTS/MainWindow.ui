@@ -39,6 +39,7 @@
     <property name="title">
      <string>Inverse</string>
     </property>
+    <addaction name="actionRandomGeneration"/>
     <addaction name="actionMCTS"/>
    </widget>
    <addaction name="menuFile"/>
@@ -90,6 +91,11 @@
   <action name="actionMCTS">
    <property name="text">
     <string>MCTS</string>
+   </property>
+  </action>
+  <action name="actionRandomGeneration">
+   <property name="text">
+    <string>Random Generation</string>
    </property>
   </action>
  </widget>
