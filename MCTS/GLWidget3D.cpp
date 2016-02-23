@@ -307,7 +307,7 @@ void GLWidget3D::runMCTS() {
 	cv::Mat sketchMat(swapped.height(), swapped.width(), CV_8UC3, const_cast<uchar*>(swapped.bits()), swapped.bytesPerLine());
 
 	mcts::MCTS mcts(sketchMat, this);
-	mcts.inverse(300, 3000);
+	mcts.inverse(10, 100);
 
 	time_t end = clock();
 	std::cout << "Elapsed time: " << (double)(end - start) / CLOCKS_PER_SEC << "sec" << std::endl;

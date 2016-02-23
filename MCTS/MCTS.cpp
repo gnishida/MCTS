@@ -12,10 +12,11 @@ namespace mcts {
 	const float INITIAL_SEGMENT_LENGTH = 0.5f;
 	const float INITIAL_SEGMENT_WIDTH = 0.3f;
 	const int MAX_LEVEL = 3;
-	const int MAX_DIST = 12;
+	const int MAX_DIST = 20;
 	const float SIMILARITY_METRICS_ALPHA = 10000.0f;
 	const float SIMILARITY_METRICS_BETA = 5000.0f;
 	const int BASE_PART = 3;
+	const int SIMULATION_DEPTH = 2;
 
 	float time_select = 0.0f;
 	float time_expand = 0.0f;
@@ -246,7 +247,12 @@ namespace mcts {
 			QString filename = QString("results/result_%1.png").arg(iter);
 			QImage image;
 			render(state.derivationTree, image);
-			image.save(filename);
+			cv::Mat backMat = target.clone();
+			QImage background(backMat.data, backMat.cols, backMat.rows, backMat.step, QImage::Format_RGB888);
+			QPainter painter(&background);
+			painter.setOpacity(0.5);
+			painter.drawImage(0, 0, image);
+			background.save(filename);
 			////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
 
 			// これ以上derivationできない場合は、終了
@@ -299,6 +305,9 @@ namespace mcts {
 			backpropage(childNode, value);
 			end = clock();
 			time_backpropagate += (double)(end - start) / CLOCKS_PER_SEC;
+
+			// 子ノードが1個なら、終了
+			if (rootNode->unexpandedActions.size() == 0 && rootNode->children.size() <= 1) break;
 		}
 
 		////////////////////////////////////////////// DEBUG //////////////////////////////////////////////
@@ -480,11 +489,16 @@ namespace mcts {
 	}
 
 	void randomDerivation(DerivationTree& derivationTree, std::list<boost::shared_ptr<Nonterminal> >& queue) {
+		int start_depth = queue.front()->dist;
+
 		while (!queue.empty()) {
 			boost::shared_ptr<Nonterminal> node = queue.front();
 			queue.pop_front();
 
 			if (node->terminal) continue;
+
+			// simulation depth以上ならシミュレーションを終了
+			if (SIMULATION_DEPTH > 0 && node->dist >= start_depth + SIMULATION_DEPTH) continue;
 
 			std::vector<int> act = actions(node);
 			if (act.size() > 0) {
@@ -494,36 +508,6 @@ namespace mcts {
 			else {
 				int z = 0;
 			}
-
-			/*
-			if (node->name == "X") {
-				if (node->dist >= MAX_DIST - 1) {
-					node->name = "F";
-					node->terminal = true;
-				}
-				else if (node->dist < BASE_PART) {
-					applyRule(derivationTree, node, 1, queue);
-				}
-				else {
-					if (node->level < MAX_LEVEL - 1) {
-						int action = rand() % 2 + 1; // 1 -- 延伸 / 2 -- 枝分かれ
-						applyRule(derivationTree, node, action, queue);
-					}
-					else {
-						applyRule(derivationTree, node, 1, queue);
-					}
-				}
-			}
-			else if (node->name == "/") {
-				int action = rand() % 5;
-				applyRule(derivationTree, node, action, queue);
-
-			}
-			else if (node->name == "\\") {
-				int action = rand() % 8;
-				applyRule(derivationTree, node, action, queue);
-			}
-			*/
 		}
 	}
 
